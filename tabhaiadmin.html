@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Admin Panel (V2 - Pro)</title>
+    <!-- External Libraries: Tailwind for styling, Lucide for icons, Supabase for backend, etc. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        /* Custom styles for a polished look and feel */
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-icon { stroke-width: 1.5; }
+        .modal { display: none; }
+        .modal.active { display: flex; }
+        .nav-link.active { background-color: #374151; color: #facc15; }
+        .auth-screen {
+            background-image: url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1974&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+        }
+        [data-lucide] { pointer-events: none; }
+
+        /* Print-specific styles for the invoice */
+        @media print {
+            body.printing-invoice > *:not(#invoiceModal) {
+                display: none;
+            }
+            body.printing-invoice #invoiceModal {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: auto;
+                display: block !important;
+                background: white;
+                padding: 0;
+                margin: 0;
+                border: none;
+                box-shadow: none;
+            }
+            body.printing-invoice #invoiceModal > div {
+                box-shadow: none;
+                border-radius: 0;
+                width: 100%;
+                max-width: 100%;
+                padding: 0;
+            }
+             body.printing-invoice .invoice-buttons {
+                display: none;
+             }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 antialiased">
+
+    <!-- Authentication Screen: Secure login for admins -->
+    <div id="authContainer" class="auth-screen h-screen w-screen flex items-center justify-center">
+        <div class="w-full max-w-md bg-black/50 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/20">
+            <h2 class="text-3xl font-bold text-white text-center mb-2">Admin Login</h2>
+            <p class="text-gray-300 text-center mb-6">Welcome to your Restaurant Dashboard</p>
+            <form id="loginForm" class="space-y-4">
+                <input type="email" id="email" placeholder="Email Address" required class="w-full bg-gray-700/50 text-white p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-yellow-400 focus:outline-none transition">
+                <input type="password" id="password" placeholder="Password" required class="w-full bg-gray-700/50 text-white p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-yellow-400 focus:outline-none transition">
+                <button type="submit" class="w-full bg-yellow-500 text-gray-900 font-bold p-3 rounded-lg hover:bg-yellow-400 transition-transform transform hover:scale-105">Sign In</button>
+            </form>
+            <p id="authError" class="text-red-400 text-center mt-4 font-semibold"></p>
+        </div>
+    </div>
+
+    <!-- Main Application Container: Hidden until successful login -->
+    <div id="appContainer" class="hidden flex h-screen overflow-hidden">
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 bg-gray-800 text-white p-6 flex flex-col h-full fixed shadow-2xl">
+            <h1 class="text-2xl font-bold mb-8 text-yellow-400" id="restaurantNameSidebar">Admin Panel</h1>
+            <nav class="flex flex-col space-y-2" id="mainNav">
+                <a href="#dashboard" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700 active"><i data-lucide="layout-dashboard" class="mr-3 sidebar-icon"></i>Dashboard</a>
+                <a href="#orders" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="shopping-cart" class="mr-3 sidebar-icon"></i>Live Orders</a>
+                <a href="#menu" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="book-open" class="mr-3 sidebar-icon"></i>Menu Mgt.</a>
+                <a href="#tables" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="armchair" class="mr-3 sidebar-icon"></i>Table Mgt.</a>
+                <a href="#history" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="history" class="mr-3 sidebar-icon"></i>Order History</a>
+                <a href="#analytics" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="bar-chart-2" class="mr-3 sidebar-icon"></i>Analytics</a>
+                <a href="#reviews" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="star" class="mr-3 sidebar-icon"></i>Reviews</a>
+                <a href="#taxes" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="percent" class="mr-3 sidebar-icon"></i>Tax Mgt.</a>
+                <a href="#promotions" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="ticket" class="mr-3 sidebar-icon"></i>Promotions</a>
+                <a href="#settings" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="settings" class="mr-3 sidebar-icon"></i>Settings</a>
+            </nav>
+            <div class="mt-auto">
+                <p id="userEmail" class="text-sm text-gray-400 truncate"></p>
+                <button id="logoutBtn" class="w-full text-left flex items-center p-3 rounded-lg hover:bg-red-600/80 mt-2 transition-colors"><i data-lucide="log-out" class="mr-3 sidebar-icon"></i>Logout</button>
+                <p class="text-xs text-gray-500 mt-4">Version 2.4</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area: Dynamically displays pages -->
+        <main class="ml-64 flex-1 p-8 bg-gray-50 overflow-y-auto">
+             <!-- Dashboard Page -->
+            <div id="dashboard" class="page">
+                 <h2 class="text-4xl font-extrabold mb-6 text-gray-800">Dashboard</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-md transition-transform transform hover:-translate-y-1"><h3 class="text-gray-500 font-semibold">Today's Revenue</h3><p class="text-3xl font-bold text-green-500" id="dailyRevenue">₹0</p></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md transition-transform transform hover:-translate-y-1"><h3 class="text-gray-500 font-semibold">Today's Orders</h3><p class="text-3xl font-bold text-blue-500" id="dailyOrders">0</p></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md transition-transform transform hover:-translate-y-1"><h3 class="text-gray-500 font-semibold">Avg. Table Turn Time</h3><p class="text-3xl font-bold text-purple-500" id="avgTurnTime">0m 0s</p></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md transition-transform transform hover:-translate-y-1"><h3 class="text-gray-500 font-semibold">Pending Orders</h3><p class="text-3xl font-bold text-yellow-500" id="pendingOrders">0</p></div>
+                </div>
+            </div>
+             
+             <!-- Live Orders Page -->
+             <div id="orders" class="page hidden"><h2 class="text-4xl font-extrabold mb-6 text-gray-800">Live Orders</h2><div id="liveOrdersContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><p class="text-gray-500 col-span-full">Awaiting new orders...</p></div></div>
+            
+             <!-- Menu Management Page -->
+             <div id="menu" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Menu Management</h2><button id="addCategoryBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-300 flex items-center shadow-lg hover:shadow-xl"><i data-lucide="plus-circle" class="mr-2"></i>Add Category</button></div><div id="menuContainer" class="space-y-8"></div></div>
+            
+             <!-- Table Management Page -->
+             <div id="tables" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Table Management</h2><button id="addTableBtn" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition duration-300 flex items-center shadow-lg hover:shadow-xl"><i data-lucide="plus-circle" class="mr-2"></i>Add Table</button></div><div id="tablesContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div></div>
+            
+             <!-- Order History Page -->
+             <div id="history" class="page hidden"><h2 class="text-4xl font-extrabold mb-6 text-gray-800">Order History</h2><div class="bg-white p-6 rounded-xl shadow-md overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-4">Order ID</th><th class="p-4">Table</th><th class="p-4">Total</th><th class="p-4">Payment</th><th class="p-4">Date</th><th class="p-4">Actions</th></tr></thead><tbody id="historyContainer"></tbody></table></div></div>
+
+             <!-- Analytics Page -->
+            <div id="analytics" class="page hidden">
+                <h2 class="text-4xl font-extrabold mb-6 text-gray-800">Analytics & Reports</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Menu Item Performance</h3><canvas id="menuPerformanceChart"></canvas></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Daily Sales (Last 7 Days)</h3><canvas id="dailySalesChart"></canvas></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Time to First Item (Coming Soon)</h3><p class="text-gray-500">This metric will be available after the customer menu is launched.</p></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Order Summary by Table</h3><canvas id="tableSalesChart"></canvas></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md col-span-full"><h3 class="text-xl font-bold mb-4">Admin Activity Log</h3><div class="max-h-96 overflow-y-auto"><table class="w-full text-left text-sm"><thead class="bg-gray-50 sticky top-0"><tr><th class="p-3">Time</th><th class="p-3">User</th><th class="p-3">Action</th></tr></thead><tbody id="activityLogContainer" class="divide-y"></tbody></table></div></div>
+                </div>
+            </div>
+
+            <!-- Reviews Page -->
+            <div id="reviews" class="page hidden">
+                <div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Customer Reviews</h2><a id="replyOnGoogleBtn" href="#" target="_blank" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-300">Reply on Google</a></div>
+                <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-lg mb-6" role="alert"><p class="font-bold">Developer Note:</p><p>This section is a placeholder. Real-time Google Reviews integration requires complex, secure, server-side authentication (e.g., using a Supabase Edge Function) to protect API keys. The "Reply" button will link to the Google Business Profile URL you provide in Settings.</p></div>
+                <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Latest Reviews (Mockup)</h3><div class="space-y-4" id="reviewsContainer"></div></div>
+            </div>
+             
+             <!-- Tax Management Page -->
+             <div id="taxes" class="page hidden">
+                <div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Tax Management</h2><button id="addTaxBtn" class="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition duration-300 flex items-center shadow-lg hover:shadow-xl"><i data-lucide="plus-circle" class="mr-2"></i>Add Tax Rule</button></div>
+                <div class="bg-white p-6 rounded-xl shadow-md overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-4">Name</th><th class="p-4">Rate (%)</th><th class="p-4">Enabled</th><th class="p-4">Actions</th></tr></thead><tbody id="taxesContainer"></tbody></table></div>
+             </div>
+             
+             <!-- Promotions Page -->
+             <div id="promotions" class="page hidden">
+                <div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Promotions</h2><button id="addPromoBtn" class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition duration-300 flex items-center shadow-lg hover:shadow-xl"><i data-lucide="plus-circle" class="mr-2"></i>Add Promotion</button></div>
+                <div class="bg-white p-6 rounded-xl shadow-md overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-4">Code</th><th class="p-4">Discount (%)</th><th class="p-4">Active</th><th class="p-4">Actions</th></tr></thead><tbody id="promosContainer"></tbody></table></div>
+             </div>
+             
+             <!-- Settings Page -->
+            <div id="settings" class="page hidden">
+                 <h2 class="text-4xl font-extrabold mb-6 text-gray-800">Settings</h2>
+                 <div class="bg-white p-8 rounded-xl shadow-md max-w-2xl space-y-6">
+                    <div><h3 class="text-xl font-bold mb-2">Basic Info</h3><label for="restaurantName" class="block text-sm font-medium text-gray-700">Restaurant Name</label><input type="text" id="restaurantName" class="mt-1 block w-full p-2 border rounded-md"><label for="restaurantCurrency" class="mt-4 block text-sm font-medium text-gray-700">Currency Symbol</label><input type="text" id="restaurantCurrency" class="mt-1 block w-full p-2 border rounded-md"></div>
+                    <div><h3 class="text-xl font-bold mb-2">Branding</h3><label for="logoUrl" class="block text-sm font-medium text-gray-700">Logo URL (for invoices)</label><input type="text" id="logoUrl" placeholder="https://your-site.com/logo.png" class="mt-1 block w-full p-2 border rounded-md"><label for="primaryColor" class="mt-4 block text-sm font-medium text-gray-700">Primary Color</label><input type="color" id="primaryColor" class="mt-1 block w-full p-1 h-10 border rounded-md"><label for="secondaryColor" class="mt-4 block text-sm font-medium text-gray-700">Secondary Color</label><input type="color" id="secondaryColor" class="mt-1 block w-full p-1 h-10 border rounded-md"></div>
+                    <div><h3 class="text-xl font-bold mb-2">Integrations</h3><label for="googleBusinessLink" class="block text-sm font-medium text-gray-700">Google Business Profile URL</label><input type="url" id="googleBusinessLink" placeholder="https://g.page/r/..." class="mt-1 block w-full p-2 border rounded-md"></div>
+                    <button id="saveSettingsBtn" class="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700">Save All Settings</button>
+                 </div>
+                 <!-- Data Management Section -->
+                 <div class="bg-white p-8 rounded-xl shadow-md max-w-2xl space-y-6 mt-8 border-t-4 border-red-500">
+                    <h3 class="text-xl font-bold mb-2 text-red-700">Data Management (Danger Zone)</h3>
+                    <p class="text-sm text-gray-600">Permanently delete transactional data (Order History and Admin Activity Logs). Menu, tables, and other settings will NOT be affected. This action cannot be undone.</p>
+                    <div class="flex flex-wrap gap-4">
+                        <button id="delete24hBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Delete Last 24 Hours</button>
+                        <button id="delete7dBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Delete Last 7 Days</button>
+                        <button id="delete30dBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Delete Last 30 Days</button>
+                    </div>
+                    <div class="border-t pt-4">
+                        <p class="text-sm font-medium text-gray-700">Custom Date Range Deletion</p>
+                        <div class="flex items-center gap-4 mt-2">
+                            <label for="deleteStartDate">From:</label>
+                            <input type="date" id="deleteStartDate" class="p-2 border rounded-md">
+                            <label for="deleteEndDate">To:</label>
+                            <input type="date" id="deleteEndDate" class="p-2 border rounded-md">
+                            <button id="deleteCustomBtn" class="bg-red-800 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-900">Delete Range</button>
+                        </div>
+                    </div>
+                    <div class="border-t pt-4">
+                        <h3 class="text-xl font-bold mb-2 text-gray-800">Export Data</h3>
+                        <p class="text-sm text-gray-600">Download all order and activity log data as a single JSON file.</p>
+                        <button id="downloadDataBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 mt-2">Download All Data</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Collection of Modals for CRUD operations -->
+    <div id="categoryModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h3 class="text-2xl font-bold mb-4">Add/Edit Category</h3><input type="hidden" id="categoryId"><input type="text" id="categoryNameInput" placeholder="Category Name" class="w-full p-3 border rounded-lg mb-4"><div class="flex justify-end space-x-4"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveCategoryBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg">Save</button></div></div></div>
+    <div id="tableModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h3 class="text-2xl font-bold mb-4">Add/Edit Table</h3><input type="hidden" id="tableId"><input type="text" id="tableNameInput" placeholder="Table Name or Number" class="w-full p-3 border rounded-lg mb-4"><div class="flex justify-end space-x-4"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveTableBtn" class="bg-green-600 text-white px-6 py-2 rounded-lg">Save</button></div></div></div>
+    <div id="qrModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md text-center"><h3 id="qrModalTitle" class="text-2xl font-bold mb-4"></h3><p class="text-sm text-gray-400">Scan for Menu • No app needed.</p><div id="qrcode" class="flex justify-center my-4"></div><button class="modal-cancel mt-6 bg-gray-300 px-6 py-2 rounded-lg">Close</button></div></div>
+    <div id="itemModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg"><h3 id="itemModalTitle" class="text-2xl font-bold mb-4"></h3><input type="hidden" id="itemId"><input type="hidden" id="itemCategoryId"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><input type="text" id="itemNameInput" placeholder="Item Name" class="w-full p-3 border rounded-lg md:col-span-2"><textarea id="itemDescInput" placeholder="Description" class="w-full p-3 border rounded-lg md:col-span-2"></textarea><input type="number" id="itemPriceInput" placeholder="Price" class="w-full p-3 border rounded-lg"><input type="file" id="itemImageInput" accept="image/*" class="w-full p-2 border rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"></div><img id="itemImagePreview" src="" class="hidden w-24 h-24 object-cover rounded-lg my-4"><div class="flex justify-end space-x-4 mt-6"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveItemBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg">Save Item</button></div></div></div>
+    <div id="taxModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h3 class="text-2xl font-bold mb-4">Add/Edit Tax</h3><input type="hidden" id="taxId"><input type="text" id="taxNameInput" placeholder="Tax Name (e.g., GST)" class="w-full p-3 border rounded-lg mb-4"><input type="number" id="taxRateInput" placeholder="Rate in %" class="w-full p-3 border rounded-lg mb-4"><div class="flex justify-end space-x-4"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveTaxBtn" class="bg-purple-600 text-white px-6 py-2 rounded-lg">Save</button></div></div></div>
+    <div id="promoModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h3 class="text-2xl font-bold mb-4">Add/Edit Promotion</h3><input type="hidden" id="promoId"><input type="text" id="promoCodeInput" placeholder="Promo Code (e.g., SAVE10)" class="w-full p-3 border rounded-lg mb-4"><input type="number" id="promoDiscountInput" placeholder="Discount in %" class="w-full p-3 border rounded-lg mb-4"><div class="flex justify-end space-x-4"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="savePromoBtn" class="bg-red-600 text-white px-6 py-2 rounded-lg">Save</button></div></div></div>
+    
+    <!-- Invoice Modal for Printing -->
+    <div id="invoiceModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl">
+            <div id="invoiceContent" class="p-8 border rounded-lg">
+                <!-- Invoice content will be dynamically generated here -->
+            </div>
+            <div class="flex justify-end space-x-4 mt-6 invoice-buttons">
+                <button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Close</button>
+                <button id="downloadPdfBtn" class="bg-green-600 text-white px-6 py-2 rounded-lg flex items-center"><i data-lucide="download" class="mr-2 h-4 w-4"></i>Download PDF</button>
+                <button id="printInvoiceBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center"><i data-lucide="printer" class="mr-2 h-4 w-4"></i>Print</button>
+            </div>
+        </div>
+    </div>
+    
+     <!-- Confirmation Modal for Deletion -->
+    <div id="confirmDeleteModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+            <h3 class="text-2xl font-bold mb-4 text-red-700">Are you absolutely sure?</h3>
+            <p id="confirmDeleteText" class="mb-6">This action cannot be undone. This will permanently delete the selected data.</p>
+            <div class="flex justify-end space-x-4">
+                <button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button>
+                <button id="confirmDeleteBtn" class="bg-red-600 text-white px-6 py-2 rounded-lg">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Notification/Toast Element -->
+    <div id="toast" class="fixed top-5 right-5 bg-green-500 text-white py-3 px-6 rounded-lg shadow-xl text-lg font-semibold opacity-0 translate-y-10 transition-all duration-300"></div>
+
+    <!-- Main JavaScript Logic -->
+    <script type="module">
+        // --- SUPABASE INITIALIZATION ---
+        const supabaseUrl = 'https://xuneoezzbcmryywdjean.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1bmVvZXp6YmNtcnl5d2RqZWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzE4NzIsImV4cCI6MjA3NDgwNzg3Mn0.e7hu6m0eKq8PpI78fMsMHujGF1tIh518n2G1motw788';
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+        // --- GLOBAL STATE & VARIABLES ---
+        let currentUser = null;
+        let menuPerformanceChart = null;
+        let dailySalesChart = null;
+        let tableSalesChart = null;
+        let restaurantSettings = {};
+        let categoriesCache = [];
+        let tablesCache = [];
+        let ordersCache = [];
+
+        // --- UTILITY FUNCTIONS ---
+        const showToast = (message, isError = false) => {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `fixed top-5 right-5 text-white py-3 px-6 rounded-lg shadow-xl text-lg font-semibold opacity-0 translate-y-10 transition-all duration-300 ${isError ? 'bg-red-500' : 'bg-green-500'}`;
+            toast.classList.remove('opacity-0', 'translate-y-10');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-10');
+            }, 3000);
+        };
+
+        const logActivity = async (action) => {
+            if (!currentUser) return;
+            const { error } = await supabaseClient.from('activity_logs').insert({ admin_email: currentUser.email, action });
+            if(error) console.error('Error logging activity:', error.message);
+        };
+        
+        // --- AUTHENTICATION LOGIC ---
+        const authContainer = document.getElementById('authContainer');
+        const appContainer = document.getElementById('appContainer');
+
+        const checkSession = async () => {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session?.user) {
+                currentUser = session.user;
+                authContainer.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+                initializeApp();
+            } else {
+                currentUser = null;
+                authContainer.classList.remove('hidden');
+                appContainer.classList.add('hidden');
+            }
+        };
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                document.getElementById('authError').textContent = error.message;
+            } else {
+                document.getElementById('authError').textContent = '';
+                await logActivity('Logged in');
+                await checkSession();
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await logActivity('Logged out');
+            await supabaseClient.auth.signOut();
+            await checkSession();
+        });
+
+        // --- INITIALIZATION & DATA FETCHING ---
+        async function initializeApp() {
+            lucide.createIcons();
+            document.getElementById('userEmail').textContent = currentUser.email;
+            await fetchAndRenderSettings();
+            
+            await Promise.all([
+                fetchAndRenderMenu(),
+                fetchAndRenderTables(),
+                fetchOrders(),
+                fetchAndRenderTaxes(),
+                fetchAndRenderPromos(),
+            ]);
+
+            renderLiveOrders();
+            renderOrderHistory();
+            renderAnalytics();
+
+            setupRealtimeListeners();
+            setupEventListeners();
+        }
+        
+        // --- REAL-TIME LISTENERS ---
+        function setupRealtimeListeners() {
+            supabaseClient.channel('public-changes')
+                .on('postgres_changes', { event: '*', schema: 'public' }, async (payload) => {
+                    console.log('Realtime change received:', payload);
+                    switch(payload.table) {
+                        case 'orders':
+                        case 'activity_logs': // Refresh data if logs are affected by deletion
+                            await fetchOrders();
+                            renderLiveOrders();
+                            renderOrderHistory();
+                            renderDashboardData();
+                            renderAnalytics();
+                            break;
+                        case 'categories': case 'items':
+                            await fetchAndRenderMenu(); renderAnalytics(); break;
+                        case 'tables': await fetchAndRenderTables(); break;
+                        case 'taxes': await fetchAndRenderTaxes(); break;
+                        case 'promotions': await fetchAndRenderPromos(); break;
+                    }
+                })
+                .subscribe();
+        }
+
+        // --- DATA FETCHING & CACHING ---
+        async function fetchAndRenderSettings() {
+            const { data, error } = await supabaseClient.from('settings').select('*').limit(1).single();
+            if (data) {
+                restaurantSettings = data;
+                document.getElementById('restaurantName').value = data.name || '';
+                document.getElementById('restaurantCurrency').value = data.currency_symbol || '₹';
+                document.getElementById('logoUrl').value = data.logo_url || '';
+                document.getElementById('primaryColor').value = data.primary_color || '#facc15';
+                document.getElementById('secondaryColor').value = data.secondary_color || '#1f2937';
+                document.getElementById('googleBusinessLink').value = data.google_business_url || '';
+                document.getElementById('restaurantNameSidebar').textContent = data.name || 'Admin Panel';
+                document.getElementById('replyOnGoogleBtn').href = data.google_business_url || '#';
+            }
+        }
+        
+        async function fetchOrders() {
+            const { data, error } = await supabaseClient.from('orders').select('*').order('created_at', { ascending: false });
+            if (error) { console.error('Error fetching orders:', error); return; }
+            ordersCache = data;
+        }
+
+        async function fetchAndRenderMenu() {
+            const { data: categories, error } = await supabaseClient.from('categories').select(`*, items (*)`).order('created_at');
+            if(error) { showToast("Could not load menu.", true); return; }
+            categoriesCache = categories;
+            renderMenu();
+        }
+        
+        async function fetchAndRenderTables() {
+            const { data, error } = await supabaseClient.from('tables').select('*').order('name');
+            if (error) return;
+            tablesCache = data;
+            renderTables();
+        }
+        
+        async function fetchAndRenderTaxes() {
+            const { data, error } = await supabaseClient.from('taxes').select('*');
+            if(error) return;
+            document.getElementById('taxesContainer').innerHTML = data.map(tax => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-4 font-medium">${tax.name}</td><td class="p-4">${tax.rate_percent}%</td>
+                    <td class="p-4"><input type="checkbox" class="tax-enabled-toggle" data-id="${tax.id}" ${tax.is_enabled ? 'checked' : ''}></td>
+                    <td class="p-4 space-x-2"><button class="edit-tax-btn text-blue-600" data-id="${tax.id}" data-name="${tax.name}" data-rate="${tax.rate_percent}">Edit</button><button class="delete-tax-btn text-red-600" data-id="${tax.id}">Delete</button></td>
+                </tr>`).join('');
+        }
+
+        async function fetchAndRenderPromos() {
+            const { data, error } = await supabaseClient.from('promotions').select('*');
+            if(error) return;
+            document.getElementById('promosContainer').innerHTML = data.map(promo => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-4 font-mono bg-gray-100 rounded">${promo.code}</td><td class="p-4">${promo.discount_percent}%</td>
+                    <td class="p-4"><input type="checkbox" class="promo-active-toggle" data-id="${promo.id}" ${promo.is_active ? 'checked' : ''}></td>
+                    <td class="p-4 space-x-2"><button class="edit-promo-btn text-blue-600" data-id="${promo.id}" data-code="${promo.code}" data-discount="${promo.discount_percent}">Edit</button><button class="delete-promo-btn text-red-600" data-id="${promo.id}">Delete</button></td>
+                </tr>`).join('');
+        }
+        
+        // --- UI RENDERING FUNCTIONS ---
+        function renderMenu() {
+            document.getElementById('menuContainer').innerHTML = categoriesCache.map(category => `
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-2xl font-bold text-gray-800">${category.name}</h3>
+                        <div class="space-x-2">
+                            <button class="edit-category-btn text-blue-500 hover:text-blue-700 p-2" data-id="${category.id}" data-name="${category.name}"><i data-lucide="edit"></i></button>
+                            <button class="delete-category-btn text-red-500 hover:text-red-700 p-2" data-id="${category.id}"><i data-lucide="trash-2"></i></button>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        ${(category.items || []).map(item => `
+                            <div class="flex items-center justify-between border-t pt-4">
+                                <div class="flex items-center"><img src="${item.image_url || 'https://placehold.co/100x100/FACC15/1F2937?text=Food'}" class="w-16 h-16 rounded-lg object-cover mr-4">
+                                    <div><p class="font-bold text-lg">${item.name} ${!item.is_available ? '<span class="text-xs bg-red-100 text-red-700 p-1 rounded">Unavailable</span>' : ''}</p>
+                                        <p class="text-sm text-gray-500">${item.description || ''}</p>
+                                        <p class="font-semibold text-gray-700">${restaurantSettings.currency_symbol}${item.price}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                     <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" value="" class="sr-only peer item-availability-toggle" data-id="${item.id}" ${item.is_available ? 'checked' : ''}><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-green-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div></label>
+                                    <button class="edit-item-btn p-2 text-gray-600 hover:text-blue-600" data-item='${JSON.stringify(item)}'><i data-lucide="edit"></i></button>
+                                </div>
+                            </div>`).join('') || '<p class="text-gray-400 italic">No items in this category yet.</p>'}
+                    </div>
+                    <button class="add-item-btn mt-4 w-full border-2 border-dashed border-gray-300 hover:border-blue-500 hover:text-blue-500 text-gray-500 p-3 rounded-lg transition" data-category-id="${category.id}">+ Add New Item</button>
+                </div>`).join('');
+            lucide.createIcons();
+        }
+        
+        function renderTables() {
+            document.getElementById('tablesContainer').innerHTML = tablesCache.map(table => `
+                <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                    <p class="text-xl font-bold">${table.name}</p>
+                    <div class="mt-4 space-x-2">
+                        <button class="show-qr-btn bg-yellow-400 px-4 py-2 rounded-lg font-semibold" data-id="${table.id}" data-name="${table.name}">Show QR</button>
+                        <button class="delete-table-btn text-red-500" data-id="${table.id}">Delete</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function renderLiveOrders() {
+            const liveOrders = ordersCache.filter(o => o.status === 'pending' || o.status === 'preparing');
+            const container = document.getElementById('liveOrdersContainer');
+            if (liveOrders.length === 0) {
+                container.innerHTML = `<p class="text-gray-500 col-span-full">Awaiting new orders...</p>`; return;
+            }
+            container.innerHTML = liveOrders.map(order => {
+                const tableName = tablesCache.find(t => t.id === order.table_id)?.name || 'Unknown Table';
+                const timeSince = Math.floor((new Date() - new Date(order.created_at)) / 60000);
+                
+                let statusBadge = '';
+                if (order.status === 'pending') {
+                    statusBadge = `<span class="text-xs font-semibold bg-red-100 text-red-800 px-2 py-1 rounded-full">New</span>`;
+                } else if (order.status === 'preparing') {
+                    statusBadge = `<span class="text-xs font-semibold bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Preparing</span>`;
+                }
+
+                return `
+                <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 ${order.status === 'pending' ? 'border-red-500' : 'border-yellow-500'}">
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-xl font-bold">${tableName}</h4>
+                        <div class="flex items-center space-x-2">
+                           ${statusBadge}
+                           <span class="text-sm font-semibold bg-gray-200 text-gray-700 px-2 py-1 rounded-full">${timeSince}m ago</span>
+                        </div>
+                    </div>
+                    <div class="my-4 space-y-2 border-t border-b py-2">${order.order_details.items.map(i => `<p><span class="font-bold">${i.quantity}x</span> ${i.name}</p>`).join('')}</div>
+                    <div class="flex space-x-2">
+                        ${order.status === 'pending' ? `<button class="update-order-status-btn flex-1 bg-yellow-500 text-white p-2 rounded-lg" data-id="${order.id}" data-status="preparing">Start Preparing</button>` : ''}
+                        ${order.status === 'preparing' ? `<button class="update-order-status-btn flex-1 bg-green-500 text-white p-2 rounded-lg" data-id="${order.id}" data-status="completed">Mark as Completed</button>` : ''}
+                        <button class="update-order-status-btn bg-gray-500 text-white p-2 rounded-lg" data-id="${order.id}" data-status="cancelled">Cancel</button>
+                    </div>
+                </div>`
+            }).join('');
+        }
+        
+        function renderOrderHistory() {
+            const historyOrders = ordersCache.filter(o => o.status === 'completed' || o.status === 'cancelled');
+            document.getElementById('historyContainer').innerHTML = historyOrders.map(order => {
+                const tableName = tablesCache.find(t => t.id === order.table_id)?.name || 'Unknown';
+                const orderIdDisplay = `${tableName.replace(' ','-')}-${order.id.substring(0,6)}`;
+                return `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-4 font-mono text-xs">${orderIdDisplay}</td><td class="p-4">${tableName}</td>
+                    <td class="p-4 font-semibold">${restaurantSettings.currency_symbol || '₹'}${order.order_details.total.toFixed(2)}</td>
+                    <td class="p-4"><span class="px-2 py-1 text-xs rounded-full ${order.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${order.payment_status}</span></td>
+                    <td class="p-4">${new Date(order.created_at).toLocaleString()}</td>
+                    <td class="p-4">
+                        <button class="generate-invoice-btn text-blue-600" data-order-id="${order.id}">Invoice</button>
+                        <button class="delete-order-btn text-red-600 ml-2" data-order-id="${order.id}">Delete</button>
+                    </td>
+                </tr>`}).join('');
+        }
+
+        async function renderDashboardData() {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const todaysOrders = ordersCache.filter(o => new Date(o.created_at) > today && o.status === 'completed');
+            const revenue = todaysOrders.reduce((sum, o) => sum + o.order_details.total, 0);
+            
+            document.getElementById('dailyRevenue').textContent = `${restaurantSettings.currency_symbol || '₹'}${revenue.toFixed(2)}`;
+            document.getElementById('dailyOrders').textContent = todaysOrders.length;
+            document.getElementById('pendingOrders').textContent = ordersCache.filter(o => ['pending', 'preparing'].includes(o.status)).length;
+            
+            const turnTimes = todaysOrders.filter(o => o.closed_at).map(o => (new Date(o.closed_at) - new Date(o.created_at)) / 1000);
+            const avgTime = turnTimes.length ? turnTimes.reduce((a,b) => a+b, 0) / turnTimes.length : 0;
+            const minutes = Math.floor(avgTime / 60); const seconds = Math.floor(avgTime % 60);
+            document.getElementById('avgTurnTime').textContent = `${minutes}m ${seconds}s`;
+        }
+
+        async function renderAnalytics() {
+            await renderDashboardData();
+            renderMenuItemPerformance();
+            renderDailySales();
+            renderTableSales();
+            renderActivityLog();
+        }
+
+        function renderMenuItemPerformance() {
+            const itemCounts = {};
+            ordersCache.forEach(order => {
+                if (order.status === 'completed') { order.order_details.items.forEach(item => { itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity; }); }
+            });
+            const sortedItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            const ctx = document.getElementById('menuPerformanceChart').getContext('2d');
+            if (menuPerformanceChart) menuPerformanceChart.destroy();
+            menuPerformanceChart = new Chart(ctx, { type: 'bar', data: { labels: sortedItems.map(item => item[0]), datasets: [{ label: 'Units Sold', data: sortedItems.map(item => item[1]), backgroundColor: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }] }, options: { indexAxis: 'y', responsive: true } });
+        }
+        
+        function renderDailySales() {
+            const salesByDay = {};
+            for(let i=6; i>=0; i--) { const d = new Date(); d.setDate(d.getDate() - i); salesByDay[d.toLocaleDateString()] = 0; }
+            ordersCache.forEach(order => {
+                if(order.status === 'completed') { const orderDate = new Date(order.created_at).toLocaleDateString(); if(salesByDay.hasOwnProperty(orderDate)) { salesByDay[orderDate] += order.order_details.total; } }
+            });
+            const ctx = document.getElementById('dailySalesChart').getContext('2d');
+            if (dailySalesChart) dailySalesChart.destroy();
+            dailySalesChart = new Chart(ctx, { type: 'line', data: { labels: Object.keys(salesByDay), datasets: [{ label: 'Daily Revenue', data: Object.values(salesByDay), fill: false, borderColor: 'rgba(75, 192, 192, 1)', tension: 0.1 }] } });
+        }
+        
+         function renderTableSales() {
+            const salesByTable = {};
+            ordersCache.forEach(order => {
+                if (order.status === 'completed') { const tableName = tablesCache.find(t => t.id === order.table_id)?.name || 'Unknown'; salesByTable[tableName] = (salesByTable[tableName] || 0) + order.order_details.total; }
+            });
+            const sortedTables = Object.entries(salesByTable).sort((a, b) => b[1] - a[1]);
+            const ctx = document.getElementById('tableSalesChart').getContext('2d');
+            if (tableSalesChart) tableSalesChart.destroy();
+            tableSalesChart = new Chart(ctx, { type: 'doughnut', data: { labels: sortedTables.map(table => table[0]), datasets: [{ label: 'Revenue by Table', data: sortedTables.map(table => table[1]), backgroundColor: ['rgba(255, 99, 132, 0.7)','rgba(54, 162, 235, 0.7)','rgba(255, 206, 86, 0.7)','rgba(75, 192, 192, 0.7)','rgba(153, 102, 255, 0.7)','rgba(255, 159, 64, 0.7)'], }] }, options: { responsive: true } });
+        }
+
+        async function renderActivityLog() {
+            const { data, error } = await supabaseClient.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(20);
+            if(error) return;
+            document.getElementById('activityLogContainer').innerHTML = data.map(log => `
+                <tr class="hover:bg-gray-50"><td class="p-3 text-gray-500">${new Date(log.created_at).toLocaleString()}</td><td class="p-3 font-medium">${log.admin_email}</td><td class="p-3">${log.action}</td></tr>`).join('');
+        }
+
+        function generateAndShowInvoice(order) {
+            if (!order) return;
+            const tableName = tablesCache.find(t => t.id === order.table_id)?.name || 'N/A';
+            const orderIdDisplay = `${tableName.replace(' ','-')}-${order.id.substring(0,6)}`;
+            
+            const invoiceContent = document.getElementById('invoiceContent');
+            invoiceContent.dataset.orderId = orderIdDisplay;
+            invoiceContent.innerHTML = `
+                <div class="flex justify-between items-center mb-8">
+                    <div><img src="${restaurantSettings.logo_url || 'https://placehold.co/150x50/1F2937/FFFFFF?text=Logo'}" alt="Logo" class="h-12"><h1 class="text-2xl font-bold mt-2">${restaurantSettings.name}</h1></div>
+                    <div class="text-right"><h2 class="text-xl font-bold">Invoice</h2><p><strong>Order ID:</strong> ${orderIdDisplay}</p><p><strong>Date:</strong> ${new Date(order.created_at).toLocaleDateString()}</p></div>
+                </div>
+                <p class="mb-4"><strong>Table:</strong> ${tableName}</p>
+                <table class="w-full text-left mb-8">
+                    <thead><tr class="bg-gray-100"><th class="p-2">Item</th><th class="p-2">Qty</th><th class="p-2 text-right">Price</th><th class="p-2 text-right">Total</th></tr></thead>
+                    <tbody>${order.order_details.items.map(i => `<tr><td class="p-2 border-b">${i.name}</td><td class="p-2 border-b">${i.quantity}</td><td class="p-2 border-b text-right">${i.price.toFixed(2)}</td><td class="p-2 border-b text-right">${(i.price * i.quantity).toFixed(2)}</td></tr>`).join('')}</tbody>
+                </table>
+                <div class="flex justify-end"><div class="w-1/2">
+                        <div class="flex justify-between"><p>Subtotal:</p><p>${order.order_details.subtotal.toFixed(2)}</p></div>
+                        ${order.order_details.taxes.map(t => `<div class="flex justify-between"><p>${t.name} (${t.rate_percent}%):</p><p>${t.amount.toFixed(2)}</p></div>`).join('')}
+                        <div class="flex justify-between font-bold text-xl mt-2 border-t pt-2"><p>Total:</p><p>${restaurantSettings.currency_symbol}${order.order_details.total.toFixed(2)}</p></div>
+                </div></div>`;
+            document.getElementById('invoiceModal').classList.add('active');
+            lucide.createIcons();
+        }
+
+        // --- EVENT LISTENERS SETUP ---
+        function setupEventListeners() {
+            document.getElementById('mainNav').addEventListener('click', (e) => {
+                if (e.target.tagName === 'A') {
+                    e.preventDefault();
+                    const targetId = e.target.getAttribute('href').substring(1);
+                    document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+                    document.getElementById(targetId).classList.remove('hidden');
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                    e.target.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => btn.closest('.modal').classList.remove('active')));
+
+            document.getElementById('addCategoryBtn').addEventListener('click', () => {
+                document.getElementById('categoryId').value = '';
+                document.getElementById('categoryNameInput').value = '';
+                document.getElementById('categoryModal').classList.add('active');
+            });
+            document.getElementById('saveCategoryBtn').addEventListener('click', async () => {
+                const id = document.getElementById('categoryId').value;
+                const name = document.getElementById('categoryNameInput').value;
+                if (!name) return showToast('Category name is required.', true);
+                const { error } = id ? await supabaseClient.from('categories').update({ name }).eq('id', id) : await supabaseClient.from('categories').insert({ name });
+                if (error) { showToast('Error saving category.', true); } else {
+                    showToast(`Category ${id ? 'updated' : 'added'}!`);
+                    document.getElementById('categoryModal').classList.remove('active');
+                    await logActivity(`${id ? 'Updated' : 'Created'} category: ${name}`);
+                    fetchAndRenderMenu();
+                }
+            });
+
+            const menuContainer = document.getElementById('menuContainer');
+            menuContainer.addEventListener('click', async e => {
+                const editBtn = e.target.closest('.edit-category-btn');
+                const deleteBtn = e.target.closest('.delete-category-btn');
+                const addBtn = e.target.closest('.add-item-btn');
+                const editItemBtn = e.target.closest('.edit-item-btn');
+                if (editBtn) {
+                    document.getElementById('categoryId').value = editBtn.dataset.id;
+                    document.getElementById('categoryNameInput').value = editBtn.dataset.name;
+                    document.getElementById('categoryModal').classList.add('active');
+                }
+                if (deleteBtn && confirm('Are you sure you want to delete this category and all its items?')) {
+                    const { error } = await supabaseClient.from('categories').delete().eq('id', deleteBtn.dataset.id);
+                    if(error) showToast('Error deleting category.', true); else { showToast('Category deleted.'); logActivity(`Deleted category ID ${deleteBtn.dataset.id}`); fetchAndRenderMenu(); }
+                }
+                if(addBtn) {
+                    document.getElementById('itemId').value = ''; document.getElementById('itemCategoryId').value = addBtn.dataset.categoryId;
+                    document.getElementById('itemNameInput').value = ''; document.getElementById('itemDescInput').value = ''; document.getElementById('itemPriceInput').value = ''; document.getElementById('itemImageInput').value = '';
+                    document.getElementById('itemImagePreview').classList.add('hidden'); document.getElementById('itemModalTitle').textContent = 'Add New Item';
+                    document.getElementById('itemModal').classList.add('active');
+                }
+                 if(editItemBtn) {
+                    const item = JSON.parse(editItemBtn.dataset.item);
+                    document.getElementById('itemId').value = item.id; document.getElementById('itemCategoryId').value = item.category_id;
+                    document.getElementById('itemNameInput').value = item.name; document.getElementById('itemDescInput').value = item.description; document.getElementById('itemPriceInput').value = item.price;
+                    document.getElementById('itemImageInput').value = ''; const preview = document.getElementById('itemImagePreview');
+                    if(item.image_url) { preview.src = item.image_url; preview.classList.remove('hidden'); } else { preview.classList.add('hidden'); }
+                    document.getElementById('itemModalTitle').textContent = 'Edit Item';
+                    document.getElementById('itemModal').classList.add('active');
+                }
+            });
+            menuContainer.addEventListener('change', async e => {
+                if (e.target.classList.contains('item-availability-toggle')) {
+                    const id = e.target.dataset.id; const is_available = e.target.checked;
+                    await supabaseClient.from('items').update({ is_available }).eq('id', id); logActivity(`Set item ${id} availability to ${is_available}`);
+                }
+            });
+            document.getElementById('saveItemBtn').addEventListener('click', async () => {
+                const id = document.getElementById('itemId').value; const category_id = document.getElementById('itemCategoryId').value;
+                const name = document.getElementById('itemNameInput').value; const description = document.getElementById('itemDescInput').value;
+                const price = parseFloat(document.getElementById('itemPriceInput').value); const imageFile = document.getElementById('itemImageInput').files[0];
+                if (!name || isNaN(price)) return showToast('Item name and a valid price are required.', true);
+                let image_url = id ? (categoriesCache.flatMap(c => c.items).find(i => i && i.id === id) || {}).image_url : null;
+                if (imageFile) {
+                    const filePath = `public/${Date.now()}-${imageFile.name}`;
+                    const { error: uploadError } = await supabaseClient.storage.from('item-images').upload(filePath, imageFile);
+                    if (uploadError) return showToast(`Image upload failed: ${uploadError.message}`, true);
+                    const { data } = supabaseClient.storage.from('item-images').getPublicUrl(filePath); image_url = data.publicUrl;
+                }
+                const itemData = { name, description, price, category_id, image_url };
+                const { error } = id ? await supabaseClient.from('items').update(itemData).eq('id', id) : await supabaseClient.from('items').insert(itemData);
+                if (error) { showToast(`Error saving item: ${error.message}`, true); } else {
+                    showToast(`Item ${id ? 'updated' : 'added'}!`); document.getElementById('itemModal').classList.remove('active');
+                    logActivity(`${id ? 'Updated' : 'Created'} item: ${name}`); fetchAndRenderMenu();
+                }
+            });
+            
+            document.getElementById('addTableBtn').addEventListener('click', () => {
+                document.getElementById('tableId').value = ''; document.getElementById('tableNameInput').value = '';
+                document.getElementById('tableModal').classList.add('active');
+            });
+            document.getElementById('saveTableBtn').addEventListener('click', async () => {
+                const name = document.getElementById('tableNameInput').value; if(!name) return;
+                const { error } = await supabaseClient.from('tables').insert({ name });
+                if(error) showToast('Error saving table', true); else { showToast('Table added!'); document.getElementById('tableModal').classList.remove('active'); logActivity(`Added table: ${name}`); fetchAndRenderTables(); }
+            });
+            document.getElementById('tablesContainer').addEventListener('click', async e => {
+                 const qrBtn = e.target.closest('.show-qr-btn'); const deleteBtn = e.target.closest('.delete-table-btn');
+                 if(qrBtn) {
+                    const tableId = qrBtn.dataset.id; const tableName = qrBtn.dataset.name; const qrContainer = document.getElementById('qrcode');
+                    qrContainer.innerHTML = ''; const customerMenuUrl = new URL('customer_menu.html', window.location.href);
+                    customerMenuUrl.searchParams.set('table_id', tableId);
+                    new QRCode(qrContainer, { text: customerMenuUrl.href, width: 256, height: 256 });
+                    document.getElementById('qrModalTitle').textContent = `QR Code for ${tableName}`;
+                    document.getElementById('qrModal').classList.add('active');
+                 }
+                 if(deleteBtn && confirm('Are you sure you want to delete this table?')) {
+                    const { error } = await supabaseClient.from('tables').delete().eq('id', deleteBtn.dataset.id);
+                    if(error) showToast('Error deleting table.', true); else { showToast('Table deleted.'); logActivity(`Deleted table ID ${deleteBtn.dataset.id}`); fetchAndRenderTables(); }
+                 }
+            });
+
+            document.getElementById('liveOrdersContainer').addEventListener('click', async e => {
+                const statusBtn = e.target.closest('.update-order-status-btn');
+                if(statusBtn) {
+                    statusBtn.disabled = true;
+                    statusBtn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+                    
+                    const orderId = statusBtn.dataset.id; const newStatus = statusBtn.dataset.status;
+                    const updateData = { status: newStatus };
+                    if (newStatus === 'completed') { updateData.closed_at = new Date().toISOString(); updateData.payment_status = 'paid'; }
+                    const { error } = await supabaseClient.from('orders').update(updateData).eq('id', orderId);
+
+                    if(error) { showToast('Error updating status.', true); } else {
+                        showToast(`Order status changed to ${newStatus}`);
+                        logActivity(`Updated order ${orderId} to ${newStatus}`);
+                        if (newStatus === 'completed') {
+                            const { data: updatedOrder } = await supabaseClient.from('orders').select('*').eq('id', orderId).single();
+                            generateAndShowInvoice(updatedOrder);
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('historyContainer').addEventListener('click', e => {
+                const invoiceBtn = e.target.closest('.generate-invoice-btn');
+                const deleteBtn = e.target.closest('.delete-order-btn');
+                if(invoiceBtn) {
+                    const orderId = invoiceBtn.dataset.orderId;
+                    const order = ordersCache.find(o => o.id === orderId);
+                    generateAndShowInvoice(order);
+                }
+                if(deleteBtn) {
+                    const orderId = deleteBtn.dataset.orderId;
+                    const orderIdDisplay = ordersCache.find(o => o.id === orderId)?.id.substring(0,6) || orderId;
+                    const message = `Are you sure you want to permanently delete order ${orderIdDisplay}? This cannot be undone.`;
+                    const deleteFunc = async () => {
+                        const { error } = await supabaseClient.from('orders').delete().eq('id', orderId);
+                        if (error) { showToast('Error deleting order.', true); } 
+                        else { showToast('Order deleted successfully.'); logActivity(`Deleted order ID ${orderId}`); }
+                    };
+                    promptForDelete(deleteFunc, message);
+                }
+            });
+
+            const setupCrudListeners = (page, tableName, modalId, addBtnId, saveBtnId, fields) => {
+                const containerId = page === 'tax' ? 'taxesContainer' : `${page}sContainer`;
+                const container = document.getElementById(containerId);
+                document.getElementById(addBtnId).addEventListener('click', () => { document.getElementById(`${page}Id`).value = ''; fields.forEach(f => document.getElementById(f.inputId).value = ''); document.getElementById(modalId).classList.add('active'); });
+                if (container) {
+                    container.addEventListener('click', async e => {
+                        const editBtn = e.target.closest(`.edit-${page}-btn`); const deleteBtn = e.target.closest(`.delete-${page}-btn`);
+                        if (editBtn) { document.getElementById(`${page}Id`).value = editBtn.dataset.id; fields.forEach(f => document.getElementById(f.inputId).value = editBtn.dataset[f.dataAttr]); document.getElementById(modalId).classList.add('active'); }
+                        if (deleteBtn && confirm(`Are you sure you want to delete this ${page}?`)) { const { error } = await supabaseClient.from(tableName).delete().eq('id', deleteBtn.dataset.id); if (error) showToast(`Error deleting ${page}.`, true); else { showToast(`${page.charAt(0).toUpperCase() + page.slice(1)} deleted.`); logActivity(`Deleted ${page} ID ${deleteBtn.dataset.id}`); } }
+                    });
+                }
+                document.getElementById(saveBtnId).addEventListener('click', async () => {
+                    const id = document.getElementById(`${page}Id`).value; const record = {};
+                    for (const f of fields) { let value = document.getElementById(f.inputId).value; record[f.dbField] = f.isNumeric ? parseFloat(value) : value; if (!value) return showToast(`${f.label} is required.`, true); }
+                    const { error } = id ? await supabaseClient.from(tableName).update(record).eq('id', id) : await supabaseClient.from(tableName).insert(record);
+                    if (error) showToast(`Error saving ${page}: ${error.message}`, true); else { showToast(`${page.charAt(0).toUpperCase() + page.slice(1)} saved!`); document.getElementById(modalId).classList.remove('active'); logActivity(`${id ? 'Updated' : 'Created'} ${page}: ${record[fields[0].dbField]}`); }
+                });
+                const setupToggleListener = (toggleContainerId, columnName) => {
+                    const toggleContainer = document.getElementById(toggleContainerId);
+                    if (toggleContainer) { toggleContainer.addEventListener('change', async e => { if(e.target.type === 'checkbox') { const id = e.target.dataset.id; const value = e.target.checked; const update = {}; update[columnName] = value; await supabaseClient.from(tableName).update(update).eq('id', id); logActivity(`Set ${tableName} ${id} ${columnName} to ${value}`); } }); }
+                };
+                if(page === 'tax') setupToggleListener('taxesContainer', 'is_enabled'); if(page === 'promo') setupToggleListener('promosContainer', 'is_active');
+            };
+
+            setupCrudListeners('tax', 'taxes', 'taxModal', 'addTaxBtn', 'saveTaxBtn', [ { inputId: 'taxNameInput', dbField: 'name', dataAttr: 'name', label: 'Tax Name' }, { inputId: 'taxRateInput', dbField: 'rate_percent', dataAttr: 'rate', label: 'Tax Rate', isNumeric: true } ]);
+            setupCrudListeners('promo', 'promotions', 'promoModal', 'addPromoBtn', 'savePromoBtn', [ { inputId: 'promoCodeInput', dbField: 'code', dataAttr: 'code', label: 'Promo Code' }, { inputId: 'promoDiscountInput', dbField: 'discount_percent', dataAttr: 'discount', label: 'Discount', isNumeric: true } ]);
+            
+            document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+                 const updates = { id: 1, name: document.getElementById('restaurantName').value, currency_symbol: document.getElementById('restaurantCurrency').value, logo_url: document.getElementById('logoUrl').value, primary_color: document.getElementById('primaryColor').value, secondary_color: document.getElementById('secondaryColor').value, google_business_url: document.getElementById('googleBusinessLink').value, };
+                 const { error } = await supabaseClient.from('settings').upsert(updates);
+                 if (error) { showToast('Error saving settings.', true); } else { showToast('Settings saved successfully!'); await logActivity('Updated restaurant settings'); fetchAndRenderSettings(); }
+            });
+
+            document.getElementById('downloadPdfBtn').addEventListener('click', () => {
+                const { jsPDF } = window.jspdf; const invoiceContent = document.getElementById('invoiceContent');
+                const doc = new jsPDF({ unit: 'px', format: 'a4', orientation: 'portrait' });
+                html2canvas(invoiceContent, { scale: 2 }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png'); const pdfWidth = doc.internal.pageSize.getWidth(); const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    const orderId = invoiceContent.dataset.orderId || 'invoice'; doc.save(`${orderId}.pdf`); logActivity(`Downloaded invoice for order ${orderId}`);
+                });
+            });
+
+            document.getElementById('printInvoiceBtn').addEventListener('click', () => {
+                logActivity(`Attempting to print invoice`);
+                document.body.classList.add('printing-invoice');
+                window.print();
+            });
+            window.addEventListener('afterprint', () => {
+                document.body.classList.remove('printing-invoice');
+            });
+
+            // --- DATA MANAGEMENT LISTENERS ---
+            const confirmDeleteModal = document.getElementById('confirmDeleteModal');
+            let deleteFunction = null;
+
+            const promptForDelete = (deleteFunc, message) => {
+                document.getElementById('confirmDeleteText').textContent = message;
+                deleteFunction = deleteFunc;
+                confirmDeleteModal.classList.add('active');
+            };
+
+            document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+                if (typeof deleteFunction === 'function') {
+                    await deleteFunction();
+                }
+                confirmDeleteModal.classList.remove('active');
+            });
+            
+            const performDelete = async (startDate) => {
+                showToast('Deletion in progress...');
+                const dateString = startDate.toISOString();
+                // Note: The original logic used lt which is "less than". This is correct for "older than".
+                const { error: orderError } = await supabaseClient.from('orders').delete().lt('created_at', dateString);
+                const { error: logError } = await supabaseClient.from('activity_logs').delete().lt('created_at', dateString);
+
+                if(orderError || logError) {
+                    showToast('An error occurred during deletion.', true);
+                    console.error('Deletion Error:', orderError || logError);
+                } else {
+                    showToast('Data older than the selected period has been deleted.');
+                    logActivity(`Deleted data before ${startDate.toLocaleDateString()}`);
+                }
+            };
+
+            document.getElementById('delete24hBtn').addEventListener('click', () => {
+                const date = new Date(); date.setDate(date.getDate() - 1);
+                promptForDelete(() => performDelete(date), 'This will permanently delete all Order History and Admin Activity older than 24 hours. Are you sure?');
+            });
+            document.getElementById('delete7dBtn').addEventListener('click', () => {
+                const date = new Date(); date.setDate(date.getDate() - 7);
+                promptForDelete(() => performDelete(date), 'This will permanently delete all Order History and Admin Activity older than 7 days. Are you sure?');
+            });
+            document.getElementById('delete30dBtn').addEventListener('click', () => {
+                const date = new Date(); date.setDate(date.getDate() - 30);
+                promptForDelete(() => performDelete(date), 'This will permanently delete all Order History and Admin Activity older than 30 days. Are you sure?');
+            });
+            document.getElementById('deleteCustomBtn').addEventListener('click', () => {
+                const startDate = document.getElementById('deleteStartDate').value;
+                const endDate = document.getElementById('deleteEndDate').value;
+                if (!startDate || !endDate) return showToast('Please select both a start and end date.', true);
+                
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999); // Include the whole end day
+
+                const message = `This will permanently delete all Order History and Admin Activity between ${start.toLocaleDateString()} and ${end.toLocaleDateString()}. Are you sure?`;
+                
+                const deleteInRange = async () => {
+                    showToast('Deletion in progress...');
+                    const { error: orderError } = await supabaseClient.from('orders').delete().gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+                    const { error: logError } = await supabaseClient.from('activity_logs').delete().gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+
+                     if(orderError || logError) {
+                        showToast('An error occurred during deletion.', true);
+                     } else {
+                        showToast('Data in the selected range has been deleted.');
+                        logActivity(`Deleted data in custom range`);
+                     }
+                };
+                promptForDelete(deleteInRange, message);
+            });
+
+            document.getElementById('downloadDataBtn').addEventListener('click', async () => {
+                showToast('Preparing data for download...');
+                const { data: orders, error: orderError } = await supabaseClient.from('orders').select('*');
+                const { data: activity_logs, error: logError } = await supabaseClient.from('activity_logs').select('*');
+
+                if(orderError || logError) return showToast('Could not fetch data for download.', true);
+
+                const dataToDownload = {
+                    restaurant_name: restaurantSettings.name || 'Export',
+                    export_date: new Date().toISOString(),
+                    orders,
+                    activity_logs
+                };
+
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToDownload, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `${restaurantSettings.name}_export_${new Date().toISOString().split('T')[0]}.json`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+                showToast('Download started!');
+                logActivity('Downloaded all data');
+            });
+        }
+        
+        checkSession();
+    </script>
+</body>
+</html>
+
