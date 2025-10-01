@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Restaurant Admin Panel (V2 - Pro)</title>
-    <!-- External Libraries: Tailwind for styling, Lucide for icons, Supabase for backend, etc. -->
+    <title>Restaurant Admin Panel</title>
+    <!-- External Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Supabase JS is critical for real-time and DB access -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF and html2canvas for PDF Export Fix -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -28,40 +30,37 @@
         }
         [data-lucide] { pointer-events: none; }
 
+        /* Styles to ensure the invoice text is editable */
+        .editable-text {
+            border: 1px solid transparent;
+            padding: 2px;
+            display: inline-block;
+        }
+        .editable-text:hover, .editable-text:focus {
+            border-color: #facc15; /* Tailwind yellow-400 */
+            outline: none;
+        }
         /* Print-specific styles for the invoice */
         @media print {
-            body.printing-invoice > *:not(#invoiceModal) {
-                display: none;
-            }
+            /* Hide everything except the invoice modal content when printing */
+            body.printing-invoice > *:not(.modal) { display: none; }
             body.printing-invoice #invoiceModal {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: auto;
-                display: block !important;
-                background: white;
-                padding: 0;
-                margin: 0;
-                border: none;
-                box-shadow: none;
+                position: absolute; left: 0; top: 0; width: 100%; height: auto;
+                display: block !important; background: white; padding: 0; margin: 0;
+                border: none; box-shadow: none;
             }
             body.printing-invoice #invoiceModal > div {
-                box-shadow: none;
-                border-radius: 0;
-                width: 100%;
-                max-width: 100%;
-                padding: 0;
+                box-shadow: none; border-radius: 0; width: 100%; max-width: 100%; padding: 0;
             }
-             body.printing-invoice .invoice-buttons {
-                display: none;
-             }
+             body.printing-invoice .invoice-buttons { display: none; }
+             /* Remove edit borders when printing */
+             .editable-text { border: none !important; padding: 0 !important; }
         }
     </style>
 </head>
 <body class="bg-gray-100 antialiased">
 
-    <!-- Authentication Screen: Secure login for admins -->
+    <!-- Authentication Screen -->
     <div id="authContainer" class="auth-screen h-screen w-screen flex items-center justify-center">
         <div class="w-full max-w-md bg-black/50 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/20">
             <h2 class="text-3xl font-bold text-white text-center mb-2">Admin Login</h2>
@@ -75,16 +74,18 @@
         </div>
     </div>
 
-    <!-- Main Application Container: Hidden until successful login -->
+    <!-- Main Application Container -->
     <div id="appContainer" class="hidden flex h-screen overflow-hidden">
         <!-- Sidebar Navigation -->
         <aside class="w-64 bg-gray-800 text-white p-6 flex flex-col h-full fixed shadow-2xl">
             <h1 class="text-2xl font-bold mb-8 text-yellow-400" id="restaurantNameSidebar">Admin Panel</h1>
-            <nav class="flex flex-col space-y-2" id="mainNav">
+            <nav class="flex flex-col space-y-2 overflow-y-auto" id="mainNav">
                 <a href="#dashboard" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700 active"><i data-lucide="layout-dashboard" class="mr-3 sidebar-icon"></i>Dashboard</a>
                 <a href="#orders" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="shopping-cart" class="mr-3 sidebar-icon"></i>Live Orders</a>
                 <a href="#menu" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="book-open" class="mr-3 sidebar-icon"></i>Menu Mgt.</a>
                 <a href="#tables" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="armchair" class="mr-3 sidebar-icon"></i>Table Mgt.</a>
+                <a href="#slideshow" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="gallery-horizontal" class="mr-3 sidebar-icon"></i>Slideshow</a>
+                <a href="#offers" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="gem" class="mr-3 sidebar-icon"></i>Offers</a>
                 <a href="#history" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="history" class="mr-3 sidebar-icon"></i>Order History</a>
                 <a href="#analytics" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="bar-chart-2" class="mr-3 sidebar-icon"></i>Analytics</a>
                 <a href="#reviews" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="star" class="mr-3 sidebar-icon"></i>Reviews</a>
@@ -92,100 +93,48 @@
                 <a href="#promotions" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="ticket" class="mr-3 sidebar-icon"></i>Promotions</a>
                 <a href="#settings" class="nav-link flex items-center p-3 rounded-lg transition-colors hover:bg-gray-700"><i data-lucide="settings" class="mr-3 sidebar-icon"></i>Settings</a>
             </nav>
-            <div class="mt-auto">
+            <div class="mt-auto pt-4">
                 <p id="userEmail" class="text-sm text-gray-400 truncate"></p>
                 <button id="logoutBtn" class="w-full text-left flex items-center p-3 rounded-lg hover:bg-red-600/80 mt-2 transition-colors"><i data-lucide="log-out" class="mr-3 sidebar-icon"></i>Logout</button>
-                <p class="text-xs text-gray-500 mt-4">Version 2.4</p>
             </div>
         </aside>
 
-        <!-- Main Content Area: Dynamically displays pages -->
+        <!-- Main Content Area -->
         <main class="ml-64 flex-1 p-8 bg-gray-50 overflow-y-auto">
-             <!-- Dashboard Page -->
-            <div id="dashboard" class="page">
+             <div id="dashboard" class="page">
                  <h2 class="text-4xl font-extrabold mb-6 text-gray-800">Dashboard</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div class="bg-white p-6 rounded-xl shadow-md transition-transform transform hover:-translate-y-1"><h3 class="text-gray-500 font-semibold">Today's Revenue</h3><p class="text-3xl font-bold text-green-500" id="dailyRevenue">₹0</p></div>
-                    <div class="bg-white p-6 rounded-xl shadow-md transition-transform transform hover:-translate-y-1"><h3 class="text-gray-500 font-semibold">Today's Orders</h3><p class="text-3xl font-bold text-blue-500" id="dailyOrders">0</p></div>
-                    <div class="bg-white p-6 rounded-xl shadow-md transition-transform transform hover:-translate-y-1"><h3 class="text-gray-500 font-semibold">Avg. Table Turn Time</h3><p class="text-3xl font-bold text-purple-500" id="avgTurnTime">0m 0s</p></div>
-                    <div class="bg-white p-6 rounded-xl shadow-md transition-transform transform hover:-translate-y-1"><h3 class="text-gray-500 font-semibold">Pending Orders</h3><p class="text-3xl font-bold text-yellow-500" id="pendingOrders">0</p></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-gray-500 font-semibold">Today's Revenue</h3><p class="text-3xl font-bold text-green-500" id="dailyRevenue">₹0</p></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-gray-500 font-semibold">Today's Orders</h3><p class="text-3xl font-bold text-blue-500" id="dailyOrders">0</p></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-gray-500 font-semibold">Avg. Table Turn Time</h3><p class="text-3xl font-bold text-purple-500" id="avgTurnTime">0m 0s</p></div>
+                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-gray-500 font-semibold">Pending Orders</h3><p class="text-3xl font-bold text-yellow-500" id="pendingOrders">0</p></div>
                 </div>
             </div>
-             
-             <!-- Live Orders Page -->
-             <div id="orders" class="page hidden"><h2 class="text-4xl font-extrabold mb-6 text-gray-800">Live Orders</h2><div id="liveOrdersContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><p class="text-gray-500 col-span-full">Awaiting new orders...</p></div></div>
-            
-             <!-- Menu Management Page -->
-             <div id="menu" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Menu Management</h2><button id="addCategoryBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-300 flex items-center shadow-lg hover:shadow-xl"><i data-lucide="plus-circle" class="mr-2"></i>Add Category</button></div><div id="menuContainer" class="space-y-8"></div></div>
-            
-             <!-- Table Management Page -->
-             <div id="tables" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Table Management</h2><button id="addTableBtn" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition duration-300 flex items-center shadow-lg hover:shadow-xl"><i data-lucide="plus-circle" class="mr-2"></i>Add Table</button></div><div id="tablesContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div></div>
-            
-             <!-- Order History Page -->
+             <div id="orders" class="page hidden"><h2 class="text-4xl font-extrabold mb-6 text-gray-800">Live Orders</h2><div id="liveOrdersContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div></div>
+             <div id="menu" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Menu Management</h2><button id="addCategoryBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 flex items-center shadow-lg"><i data-lucide="plus-circle" class="mr-2"></i>Add Category</button></div><div id="menuContainer" class="space-y-8"></div></div>
+             <div id="tables" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Table Management</h2><button id="addTableBtn" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 flex items-center shadow-lg"><i data-lucide="plus-circle" class="mr-2"></i>Add Table</button></div><div id="tablesContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div></div>
+             <div id="slideshow" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Slideshow Management</h2><button id="addSlideshowImageBtn" class="bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-700 flex items-center shadow-lg"><i data-lucide="plus-circle" class="mr-2"></i>Add Image</button></div><div id="slideshowContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div></div>
+             <div id="offers" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Offer Management</h2><button id="addOfferBtn" class="bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-700 flex items-center shadow-lg"><i data-lucide="plus-circle" class="mr-2"></i>Add Offer</button></div><div id="offersContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div></div>
              <div id="history" class="page hidden"><h2 class="text-4xl font-extrabold mb-6 text-gray-800">Order History</h2><div class="bg-white p-6 rounded-xl shadow-md overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-4">Order ID</th><th class="p-4">Table</th><th class="p-4">Total</th><th class="p-4">Payment</th><th class="p-4">Date</th><th class="p-4">Actions</th></tr></thead><tbody id="historyContainer"></tbody></table></div></div>
-
-             <!-- Analytics Page -->
-            <div id="analytics" class="page hidden">
-                <h2 class="text-4xl font-extrabold mb-6 text-gray-800">Analytics & Reports</h2>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Menu Item Performance</h3><canvas id="menuPerformanceChart"></canvas></div>
-                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Daily Sales (Last 7 Days)</h3><canvas id="dailySalesChart"></canvas></div>
-                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Time to First Item (Coming Soon)</h3><p class="text-gray-500">This metric will be available after the customer menu is launched.</p></div>
-                    <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Order Summary by Table</h3><canvas id="tableSalesChart"></canvas></div>
-                    <div class="bg-white p-6 rounded-xl shadow-md col-span-full"><h3 class="text-xl font-bold mb-4">Admin Activity Log</h3><div class="max-h-96 overflow-y-auto"><table class="w-full text-left text-sm"><thead class="bg-gray-50 sticky top-0"><tr><th class="p-3">Time</th><th class="p-3">User</th><th class="p-3">Action</th></tr></thead><tbody id="activityLogContainer" class="divide-y"></tbody></table></div></div>
-                </div>
-            </div>
-
-            <!-- Reviews Page -->
-            <div id="reviews" class="page hidden">
-                <div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Customer Reviews</h2><a id="replyOnGoogleBtn" href="#" target="_blank" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-300">Reply on Google</a></div>
-                <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-lg mb-6" role="alert"><p class="font-bold">Developer Note:</p><p>This section is a placeholder. Real-time Google Reviews integration requires complex, secure, server-side authentication (e.g., using a Supabase Edge Function) to protect API keys. The "Reply" button will link to the Google Business Profile URL you provide in Settings.</p></div>
-                <div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Latest Reviews (Mockup)</h3><div class="space-y-4" id="reviewsContainer"></div></div>
-            </div>
-             
-             <!-- Tax Management Page -->
-             <div id="taxes" class="page hidden">
-                <div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Tax Management</h2><button id="addTaxBtn" class="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition duration-300 flex items-center shadow-lg hover:shadow-xl"><i data-lucide="plus-circle" class="mr-2"></i>Add Tax Rule</button></div>
-                <div class="bg-white p-6 rounded-xl shadow-md overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-4">Name</th><th class="p-4">Rate (%)</th><th class="p-4">Enabled</th><th class="p-4">Actions</th></tr></thead><tbody id="taxesContainer"></tbody></table></div>
-             </div>
-             
-             <!-- Promotions Page -->
-             <div id="promotions" class="page hidden">
-                <div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Promotions</h2><button id="addPromoBtn" class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition duration-300 flex items-center shadow-lg hover:shadow-xl"><i data-lucide="plus-circle" class="mr-2"></i>Add Promotion</button></div>
-                <div class="bg-white p-6 rounded-xl shadow-md overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-4">Code</th><th class="p-4">Discount (%)</th><th class="p-4">Active</th><th class="p-4">Actions</th></tr></thead><tbody id="promosContainer"></tbody></table></div>
-             </div>
-             
-             <!-- Settings Page -->
-            <div id="settings" class="page hidden">
+             <div id="analytics" class="page hidden"><h2 class="text-4xl font-extrabold mb-6 text-gray-800">Analytics & Reports</h2><div class="grid grid-cols-1 lg:grid-cols-2 gap-8"><div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Menu Item Performance</h3><canvas id="menuPerformanceChart"></canvas></div><div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Daily Sales (Last 7 Days)</h3><canvas id="dailySalesChart"></canvas></div><div class="bg-white p-6 rounded-xl shadow-md"><h3 class="text-xl font-bold mb-4">Order Summary by Table</h3><canvas id="tableSalesChart"></canvas></div><div class="bg-white p-6 rounded-xl shadow-md col-span-full"><h3 class="text-xl font-bold mb-4">Admin Activity Log</h3><div class="max-h-96 overflow-y-auto"><table class="w-full text-left text-sm"><thead class="bg-gray-50 sticky top-0"><tr><th class="p-3">Time</th><th class="p-3">User</th><th class="p-3">Action</th></tr></thead><tbody id="activityLogContainer" class="divide-y"></tbody></table></div></div></div></div>
+             <div id="reviews" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Customer Reviews</h2><a id="replyOnGoogleBtn" href="#" target="_blank" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700">Reply on Google</a></div><div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-lg mb-6" role="alert"><p class="font-bold">Developer Note:</p><p>This is a placeholder. Real-time Google Reviews integration is complex. The "Reply" button links to the URL you provide in Settings.</p></div></div>
+             <div id="taxes" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Tax Management</h2><button id="addTaxBtn" class="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 flex items-center shadow-lg"><i data-lucide="plus-circle" class="mr-2"></i>Add Tax Rule</button></div><div class="bg-white p-6 rounded-xl shadow-md overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-4">Name</th><th class="p-4">Rate (%)</th><th class="p-4">Enabled</th><th class="p-4">Actions</th></tr></thead><tbody id="taxesContainer"></tbody></table></div></div>
+             <div id="promotions" class="page hidden"><div class="flex justify-between items-center mb-6"><h2 class="text-4xl font-extrabold text-gray-800">Promotions</h2><button id="addPromoBtn" class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 flex items-center shadow-lg"><i data-lucide="plus-circle" class="mr-2"></i>Add Promotion</button></div><div class="bg-white p-6 rounded-xl shadow-md overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-4">Code</th><th class="p-4">Discount (%)</th><th class="p-4">Active</th><th class="p-4">Actions</th></tr></thead><tbody id="promosContainer"></tbody></table></div></div>
+             <div id="settings" class="page hidden">
                  <h2 class="text-4xl font-extrabold mb-6 text-gray-800">Settings</h2>
                  <div class="bg-white p-8 rounded-xl shadow-md max-w-2xl space-y-6">
-                    <div><h3 class="text-xl font-bold mb-2">Basic Info</h3><label for="restaurantName" class="block text-sm font-medium text-gray-700">Restaurant Name</label><input type="text" id="restaurantName" class="mt-1 block w-full p-2 border rounded-md"><label for="restaurantCurrency" class="mt-4 block text-sm font-medium text-gray-700">Currency Symbol</label><input type="text" id="restaurantCurrency" class="mt-1 block w-full p-2 border rounded-md"></div>
-                    <div><h3 class="text-xl font-bold mb-2">Branding</h3><label for="logoUrl" class="block text-sm font-medium text-gray-700">Logo URL (for invoices)</label><input type="text" id="logoUrl" placeholder="https://your-site.com/logo.png" class="mt-1 block w-full p-2 border rounded-md"><label for="primaryColor" class="mt-4 block text-sm font-medium text-gray-700">Primary Color</label><input type="color" id="primaryColor" class="mt-1 block w-full p-1 h-10 border rounded-md"><label for="secondaryColor" class="mt-4 block text-sm font-medium text-gray-700">Secondary Color</label><input type="color" id="secondaryColor" class="mt-1 block w-full p-1 h-10 border rounded-md"></div>
+                    <div><h3 class="text-xl font-bold mb-2">Basic Info</h3><label for="restaurantName" class="block text-sm font-medium text-gray-700">Restaurant Name</label><input type="text" id="restaurantName" class="mt-1 block w-full p-2 border rounded-md"><label for="restaurantCurrency" class="mt-4 block text-sm font-medium text-gray-700">Currency Symbol</label><input type="text" id="restaurantCurrency" class="mt-1 block w-full p-2 border rounded-md"><label for="welcomeMessage" class="mt-4 block text-sm font-medium text-gray-700">Welcome Message (for customers)</label><textarea id="welcomeMessage" rows="3" class="mt-1 block w-full p-2 border rounded-md"></textarea></div>
+                    <div><h3 class="text-xl font-bold mb-2">Branding</h3><label for="logoUrl" class="block text-sm font-medium text-gray-700">Logo URL</label><input type="text" id="logoUrl" placeholder="https://..." class="mt-1 block w-full p-2 border rounded-md"></div>
                     <div><h3 class="text-xl font-bold mb-2">Integrations</h3><label for="googleBusinessLink" class="block text-sm font-medium text-gray-700">Google Business Profile URL</label><input type="url" id="googleBusinessLink" placeholder="https://g.page/r/..." class="mt-1 block w-full p-2 border rounded-md"></div>
                     <button id="saveSettingsBtn" class="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700">Save All Settings</button>
                  </div>
-                 <!-- Data Management Section -->
                  <div class="bg-white p-8 rounded-xl shadow-md max-w-2xl space-y-6 mt-8 border-t-4 border-red-500">
                     <h3 class="text-xl font-bold mb-2 text-red-700">Data Management (Danger Zone)</h3>
-                    <p class="text-sm text-gray-600">Permanently delete transactional data (Order History and Admin Activity Logs). Menu, tables, and other settings will NOT be affected. This action cannot be undone.</p>
-                    <div class="flex flex-wrap gap-4">
-                        <button id="delete24hBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Delete Last 24 Hours</button>
-                        <button id="delete7dBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Delete Last 7 Days</button>
-                        <button id="delete30dBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Delete Last 30 Days</button>
-                    </div>
-                    <div class="border-t pt-4">
-                        <p class="text-sm font-medium text-gray-700">Custom Date Range Deletion</p>
-                        <div class="flex items-center gap-4 mt-2">
-                            <label for="deleteStartDate">From:</label>
-                            <input type="date" id="deleteStartDate" class="p-2 border rounded-md">
-                            <label for="deleteEndDate">To:</label>
-                            <input type="date" id="deleteEndDate" class="p-2 border rounded-md">
-                            <button id="deleteCustomBtn" class="bg-red-800 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-900">Delete Range</button>
-                        </div>
-                    </div>
+                    <p class="text-sm text-gray-600">Permanently delete transactional data. This action cannot be undone.</p>
+                     <button id="deleteAllOrdersBtn" class="bg-red-800 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-900">Delete All Order History</button>
                     <div class="border-t pt-4">
                         <h3 class="text-xl font-bold mb-2 text-gray-800">Export Data</h3>
-                        <p class="text-sm text-gray-600">Download all order and activity log data as a single JSON file.</p>
+                        <p class="text-sm text-gray-600">Download all order and activity log data as a JSON file.</p>
                         <button id="downloadDataBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 mt-2">Download All Data</button>
                     </div>
                 </div>
@@ -193,69 +142,65 @@
         </main>
     </div>
 
-    <!-- Collection of Modals for CRUD operations -->
+    <!-- Modals -->
     <div id="categoryModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h3 class="text-2xl font-bold mb-4">Add/Edit Category</h3><input type="hidden" id="categoryId"><input type="text" id="categoryNameInput" placeholder="Category Name" class="w-full p-3 border rounded-lg mb-4"><div class="flex justify-end space-x-4"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveCategoryBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg">Save</button></div></div></div>
     <div id="tableModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h3 class="text-2xl font-bold mb-4">Add/Edit Table</h3><input type="hidden" id="tableId"><input type="text" id="tableNameInput" placeholder="Table Name or Number" class="w-full p-3 border rounded-lg mb-4"><div class="flex justify-end space-x-4"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveTableBtn" class="bg-green-600 text-white px-6 py-2 rounded-lg">Save</button></div></div></div>
-    <div id="qrModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md text-center"><h3 id="qrModalTitle" class="text-2xl font-bold mb-4"></h3><p class="text-sm text-gray-400">Scan for Menu • No app needed.</p><div id="qrcode" class="flex justify-center my-4"></div><button class="modal-cancel mt-6 bg-gray-300 px-6 py-2 rounded-lg">Close</button></div></div>
-    <div id="itemModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg"><h3 id="itemModalTitle" class="text-2xl font-bold mb-4"></h3><input type="hidden" id="itemId"><input type="hidden" id="itemCategoryId"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><input type="text" id="itemNameInput" placeholder="Item Name" class="w-full p-3 border rounded-lg md:col-span-2"><textarea id="itemDescInput" placeholder="Description" class="w-full p-3 border rounded-lg md:col-span-2"></textarea><input type="number" id="itemPriceInput" placeholder="Price" class="w-full p-3 border rounded-lg"><input type="file" id="itemImageInput" accept="image/*" class="w-full p-2 border rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"></div><img id="itemImagePreview" src="" class="hidden w-24 h-24 object-cover rounded-lg my-4"><div class="flex justify-end space-x-4 mt-6"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveItemBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg">Save Item</button></div></div></div>
+    <div id="qrModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md text-center"><h3 id="qrModalTitle" class="text-2xl font-bold mb-4"></h3><p class="text-sm text-gray-400">Scan for Menu • No app needed.</p><div id="qrcode" class="flex justify-center my-4"></div><div class="space-x-4"><button id="downloadQRBtn" data-table-name="" class="mt-6 bg-green-600 text-white px-6 py-2 rounded-lg">Download PNG</button><button class="modal-cancel mt-6 bg-gray-300 px-6 py-2 rounded-lg">Close</button></div></div></div>
+    <div id="itemModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg"><h3 id="itemModalTitle" class="text-2xl font-bold mb-4"></h3><input type="hidden" id="itemId"><input type="hidden" id="itemCategoryId"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><input type="text" id="itemNameInput" placeholder="Item Name" class="w-full p-3 border rounded-lg md:col-span-2"><textarea id="itemDescInput" placeholder="Description" class="w-full p-3 border rounded-lg md:col-span-2"></textarea><input type="number" id="itemPriceInput" placeholder="Price" class="w-full p-3 border rounded-lg"><input type="file" id="itemImageInput" accept="image/png, image/jpeg, image/webp" class="w-full p-2 border rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"></div><img id="itemImagePreview" src="" class="hidden w-24 h-24 object-cover rounded-lg my-4"><div class="flex justify-end space-x-4 mt-6"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveItemBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg">Save Item</button></div></div></div>
     <div id="taxModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h3 class="text-2xl font-bold mb-4">Add/Edit Tax</h3><input type="hidden" id="taxId"><input type="text" id="taxNameInput" placeholder="Tax Name (e.g., GST)" class="w-full p-3 border rounded-lg mb-4"><input type="number" id="taxRateInput" placeholder="Rate in %" class="w-full p-3 border rounded-lg mb-4"><div class="flex justify-end space-x-4"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveTaxBtn" class="bg-purple-600 text-white px-6 py-2 rounded-lg">Save</button></div></div></div>
     <div id="promoModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h3 class="text-2xl font-bold mb-4">Add/Edit Promotion</h3><input type="hidden" id="promoId"><input type="text" id="promoCodeInput" placeholder="Promo Code (e.g., SAVE10)" class="w-full p-3 border rounded-lg mb-4"><input type="number" id="promoDiscountInput" placeholder="Discount in %" class="w-full p-3 border rounded-lg mb-4"><div class="flex justify-end space-x-4"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="savePromoBtn" class="bg-red-600 text-white px-6 py-2 rounded-lg">Save</button></div></div></div>
+    <div id="slideshowModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h3 class="text-2xl font-bold mb-4">Add Slideshow Image</h3><input type="file" id="slideshowImageInput" accept="image/png, image/jpeg, image/webp" class="w-full p-2 border rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"><div class="flex justify-end space-x-4 mt-6"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveSlideshowImageBtn" class="bg-teal-600 text-white px-6 py-2 rounded-lg">Upload</button></div></div></div>
+    <div id="offerModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg"><h3 id="offerModalTitle" class="text-2xl font-bold mb-4"></h3><input type="hidden" id="offerId"><input type="text" id="offerTitleInput" placeholder="Offer Title" class="w-full p-3 border rounded-lg mb-4"><textarea id="offerDescInput" placeholder="Description" class="w-full p-3 border rounded-lg mb-4"></textarea><input type="file" id="offerImageInput" accept="image/png, image/jpeg, image/webp" class="w-full p-2 border rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"><img id="offerImagePreview" src="" class="hidden w-24 h-24 object-cover rounded-lg my-4"><div class="flex justify-end space-x-4 mt-6"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="saveOfferBtn" class="bg-orange-600 text-white px-6 py-2 rounded-lg">Save Offer</button></div></div></div>
+    <div id="invoiceModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl"><div id="invoiceContent" class="p-8 border rounded-lg"></div><div class="flex justify-end space-x-4 mt-6 invoice-buttons"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Close</button><button id="downloadPdfBtn" class="bg-green-600 text-white px-6 py-2 rounded-lg flex items-center"><i data-lucide="download" class="mr-2 h-4 w-4"></i>Download PDF</button><button id="printInvoiceBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center"><i data-lucide="printer" class="mr-2 h-4 w-4"></i>Print</button></div></div></div>
+    <div id="confirmDeleteModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"><div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h3 class="text-2xl font-bold mb-4 text-red-700">Are you absolutely sure?</h3><p id="confirmDeleteText" class="mb-6"></p><div id="deleteConfirmationInputContainer" class="hidden mb-4"><input type="text" id="deleteConfirmationInput" placeholder="Type DELETE to confirm" class="w-full p-3 border rounded-lg border-red-400"></div><div class="flex justify-end space-x-4"><button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button><button id="confirmDeleteBtn" class="bg-red-600 text-white px-6 py-2 rounded-lg" disabled>Yes, Delete</button></div></div></div>
     
-    <!-- Invoice Modal for Printing -->
-    <div id="invoiceModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl">
-            <div id="invoiceContent" class="p-8 border rounded-lg">
-                <!-- Invoice content will be dynamically generated here -->
-            </div>
-            <div class="flex justify-end space-x-4 mt-6 invoice-buttons">
-                <button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Close</button>
-                <button id="downloadPdfBtn" class="bg-green-600 text-white px-6 py-2 rounded-lg flex items-center"><i data-lucide="download" class="mr-2 h-4 w-4"></i>Download PDF</button>
-                <button id="printInvoiceBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center"><i data-lucide="printer" class="mr-2 h-4 w-4"></i>Print</button>
-            </div>
-        </div>
-    </div>
-    
-     <!-- Confirmation Modal for Deletion -->
-    <div id="confirmDeleteModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-            <h3 class="text-2xl font-bold mb-4 text-red-700">Are you absolutely sure?</h3>
-            <p id="confirmDeleteText" class="mb-6">This action cannot be undone. This will permanently delete the selected data.</p>
-            <div class="flex justify-end space-x-4">
-                <button class="modal-cancel bg-gray-300 px-6 py-2 rounded-lg">Cancel</button>
-                <button id="confirmDeleteBtn" class="bg-red-600 text-white px-6 py-2 rounded-lg">Yes, Delete</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Global Notification/Toast Element -->
     <div id="toast" class="fixed top-5 right-5 bg-green-500 text-white py-3 px-6 rounded-lg shadow-xl text-lg font-semibold opacity-0 translate-y-10 transition-all duration-300"></div>
 
-    <!-- Main JavaScript Logic -->
     <script type="module">
         // --- SUPABASE INITIALIZATION ---
+        // Ensure you replace these with your actual Supabase URL and anonymous key
         const supabaseUrl = 'https://xuneoezzbcmryywdjean.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1bmVvZXp6YmNtcnl5d2RqZWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzE4NzIsImV4cCI6MjA3NDgwNzg3Mn0.e7hu6m0eKq8PpI78fMsMHujGF1tIh518n2G1motw788';
         const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-        // --- GLOBAL STATE & VARIABLES ---
+        // --- GLOBAL STATE & CACHES ---
         let currentUser = null;
-        let menuPerformanceChart = null;
-        let dailySalesChart = null;
-        let tableSalesChart = null;
+        let chartInstances = {};
         let restaurantSettings = {};
-        let categoriesCache = [];
-        let tablesCache = [];
-        let ordersCache = [];
+        // Store data in caches for quick lookup and efficient rendering
+        let caches = { categories: [], items: new Map(), tables: [], orders: [], offers: [], slideshow: [], taxes: [], promos: [] };
+        // Flag to prevent chart re-rendering on every small data update
+        let analyticsRendered = false;
 
-        // --- UTILITY FUNCTIONS ---
+        // --- UTILS ---
+
+        // Debounce utility to limit function execution rate (performance fix)
+        const debounce = (func, delay) => {
+            let timeoutId;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => {
+                    func.apply(this, args);
+                }, delay);
+            };
+        };
+
+        // XSS Fix: Escape text content before insertion into innerHTML
+        const htmlEscape = (str) => {
+            if (typeof str !== 'string') return str;
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+        };
+
         const showToast = (message, isError = false) => {
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = `fixed top-5 right-5 text-white py-3 px-6 rounded-lg shadow-xl text-lg font-semibold opacity-0 translate-y-10 transition-all duration-300 ${isError ? 'bg-red-500' : 'bg-green-500'}`;
             toast.classList.remove('opacity-0', 'translate-y-10');
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-10');
-            }, 3000);
+            setTimeout(() => toast.classList.add('opacity-0', 'translate-y-10'), 3000);
         };
 
         const logActivity = async (action) => {
@@ -264,22 +209,15 @@
             if(error) console.error('Error logging activity:', error.message);
         };
         
-        // --- AUTHENTICATION LOGIC ---
+        // --- AUTH ---
         const authContainer = document.getElementById('authContainer');
         const appContainer = document.getElementById('appContainer');
-
         const checkSession = async () => {
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session?.user) {
-                currentUser = session.user;
-                authContainer.classList.add('hidden');
-                appContainer.classList.remove('hidden');
-                initializeApp();
-            } else {
-                currentUser = null;
-                authContainer.classList.remove('hidden');
-                appContainer.classList.add('hidden');
-            }
+            currentUser = session?.user || null;
+            authContainer.classList.toggle('hidden', !!currentUser);
+            appContainer.classList.toggle('hidden', !currentUser);
+            if (currentUser) initializeApp();
         };
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -287,12 +225,10 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                document.getElementById('authError').textContent = error.message;
-            } else {
-                document.getElementById('authError').textContent = '';
-                await logActivity('Logged in');
-                await checkSession();
+            document.getElementById('authError').textContent = error ? error.message : '';
+            if (!error) { 
+                await logActivity('Logged in'); 
+                await checkSession(); 
             }
         });
 
@@ -302,311 +238,556 @@
             await checkSession();
         });
 
-        // --- INITIALIZATION & DATA FETCHING ---
+        // --- INIT & DATA FETCHING ---
         async function initializeApp() {
             lucide.createIcons();
             document.getElementById('userEmail').textContent = currentUser.email;
-            await fetchAndRenderSettings();
-            
-            await Promise.all([
-                fetchAndRenderMenu(),
-                fetchAndRenderTables(),
-                fetchOrders(),
-                fetchAndRenderTaxes(),
-                fetchAndRenderPromos(),
-            ]);
-
-            renderLiveOrders();
-            renderOrderHistory();
-            renderAnalytics();
-
+            await fetchAndRenderCoreData();
             setupRealtimeListeners();
             setupEventListeners();
         }
+
+        /** Fetches static/infrequently changing data once on login */
+        async function fetchAndRenderCoreData() {
+             await Promise.all([
+                fetchSettings(),
+                fetchData('categories', 'categories', { order: 'created_at', select: '*, items (*)' }),
+                fetchData('tables', 'tables', { order: 'name' }),
+                fetchData('taxes', 'taxes'),
+                fetchData('promotions', 'promos'),
+                fetchData('slideshow_images', 'slideshow', { order: 'created_at' }),
+                fetchData('offers', 'offers', { order: 'created_at' })
+            ]);
+            // Orders are fetched dynamically for the live view
+            await Promise.all([
+                fetchAndRenderLiveOrders(),
+                fetchAndRenderOrderHistory()
+            ]);
+            renderAll();
+        }
         
-        // --- REAL-TIME LISTENERS ---
-        function setupRealtimeListeners() {
-            supabaseClient.channel('public-changes')
-                .on('postgres_changes', { event: '*', schema: 'public' }, async (payload) => {
-                    console.log('Realtime change received:', payload);
-                    switch(payload.table) {
-                        case 'orders':
-                        case 'activity_logs': // Refresh data if logs are affected by deletion
-                            await fetchOrders();
-                            renderLiveOrders();
-                            renderOrderHistory();
-                            renderDashboardData();
-                            renderAnalytics();
-                            break;
-                        case 'categories': case 'items':
-                            await fetchAndRenderMenu(); renderAnalytics(); break;
-                        case 'tables': await fetchAndRenderTables(); break;
-                        case 'taxes': await fetchAndRenderTaxes(); break;
-                        case 'promotions': await fetchAndRenderPromos(); break;
-                    }
-                })
-                .subscribe();
+        async function fetchSettings() {
+             // Settings id=1 fix - Attempt to fetch by user_email first, then fall back to generic query.
+            if (!currentUser || !currentUser.email) {
+                console.warn("User not fully authenticated or email missing. Skipping settings fetch.");
+                return;
+            }
+            
+            let data = null;
+            let error = null;
+
+            // 1. Attempt to fetch using the preferred 'user_email' key
+            try {
+                const result = await supabaseClient
+                    .from('settings')
+                    .select('*')
+                    .eq('user_email', currentUser.email)
+                    .maybeSingle();
+                data = result.data;
+                error = result.error;
+            } catch (e) {
+                // Ignore initial error, assume column doesn't exist yet, and proceed to fallback
+                console.warn("User_email column query failed, falling back to legacy/generic fetch.");
+            }
+
+            // 2. Fallback: Query by ID = 1 or simply get the first/single row if no user_email data was found.
+            // This handles the case where the user hasn't run the SQL schema migration yet.
+            if (!data) {
+                const result = await supabaseClient
+                    .from('settings')
+                    .select('*')
+                    .limit(1)
+                    .maybeSingle();
+                data = result.data;
+                error = result.error;
+            }
+
+            if (error) { 
+                // Displaying the original error message if it's not null
+                console.error('Error fetching settings (Final attempt):', error.message); 
+                return; 
+            }
+
+            restaurantSettings = data || {};
         }
 
-        // --- DATA FETCHING & CACHING ---
-        async function fetchAndRenderSettings() {
-            const { data, error } = await supabaseClient.from('settings').select('*').limit(1).single();
-            if (data) {
-                restaurantSettings = data;
-                document.getElementById('restaurantName').value = data.name || '';
-                document.getElementById('restaurantCurrency').value = data.currency_symbol || '₹';
-                document.getElementById('logoUrl').value = data.logo_url || '';
-                document.getElementById('primaryColor').value = data.primary_color || '#facc15';
-                document.getElementById('secondaryColor').value = data.secondary_color || '#1f2937';
-                document.getElementById('googleBusinessLink').value = data.google_business_url || '';
-                document.getElementById('restaurantNameSidebar').textContent = data.name || 'Admin Panel';
-                document.getElementById('replyOnGoogleBtn').href = data.google_business_url || '#';
+        async function fetchData(tableName, cacheKey, options = {}) {
+            let query = supabaseClient.from(tableName).select(options.select || '*');
+            if (options.order) {
+                const [column, direction] = options.order.split(',');
+                query = query.order(column, { ascending: direction !== 'desc' });
+            }
+            if (options.single) query = query.limit(1).single();
+            const { data, error } = await query;
+            if (error) { console.error(`Error fetching ${tableName}:`, error.message); return; }
+            
+            caches[cacheKey] = data || [];
+            
+            // Populate the flat items map for O(1) item lookup (Edit Item bug fix)
+            if (tableName === 'categories') {
+                caches.items.clear();
+                data.forEach(category => {
+                    (category.items || []).forEach(item => caches.items.set(item.id, item));
+                });
             }
         }
         
-        async function fetchOrders() {
+        async function fetchAndRenderLiveOrders() {
+            // Fetch all orders
             const { data, error } = await supabaseClient.from('orders').select('*').order('created_at', { ascending: false });
-            if (error) { console.error('Error fetching orders:', error); return; }
-            ordersCache = data;
+            if (error) { console.error('Error fetching orders:', error.message); return; }
+            caches.orders = data || [];
+            renderLiveOrders();
+            renderAnalytics(false); // Update metrics but not charts
         }
 
+        async function fetchAndRenderOrderHistory() {
+            // Re-use caches.orders if already fetched by fetchAndRenderLiveOrders
+            if (caches.orders.length === 0) {
+                 const { data, error } = await supabaseClient.from('orders').select('*').order('created_at', { ascending: false });
+                 if (error) { console.error('Error fetching orders for history:', error.message); return; }
+                 caches.orders = data || [];
+            }
+            renderOrderHistory();
+            renderAnalytics(false); // Update metrics but not charts
+        }
+        
         async function fetchAndRenderMenu() {
-            const { data: categories, error } = await supabaseClient.from('categories').select(`*, items (*)`).order('created_at');
-            if(error) { showToast("Could not load menu.", true); return; }
-            categoriesCache = categories;
+            await fetchData('categories', 'categories', { order: 'created_at', select: '*, items (*)' });
             renderMenu();
         }
-        
-        async function fetchAndRenderTables() {
-            const { data, error } = await supabaseClient.from('tables').select('*').order('name');
-            if (error) return;
-            tablesCache = data;
-            renderTables();
+
+
+        function renderAll() {
+            renderSettings(); 
+            renderMenu(); 
+            renderTables(); 
+            renderTaxes(); 
+            renderPromos(); 
+            renderSlideshow(); 
+            renderOffers(); 
+            renderAnalytics(true); // Render charts and metrics fully on initial load
         }
         
-        async function fetchAndRenderTaxes() {
-            const { data, error } = await supabaseClient.from('taxes').select('*');
-            if(error) return;
-            document.getElementById('taxesContainer').innerHTML = data.map(tax => `
-                <tr class="border-b hover:bg-gray-50">
-                    <td class="p-4 font-medium">${tax.name}</td><td class="p-4">${tax.rate_percent}%</td>
-                    <td class="p-4"><input type="checkbox" class="tax-enabled-toggle" data-id="${tax.id}" ${tax.is_enabled ? 'checked' : ''}></td>
-                    <td class="p-4 space-x-2"><button class="edit-tax-btn text-blue-600" data-id="${tax.id}" data-name="${tax.name}" data-rate="${tax.rate_percent}">Edit</button><button class="delete-tax-btn text-red-600" data-id="${tax.id}">Delete</button></td>
-                </tr>`).join('');
+        // --- REAL-TIME LISTENERS (No refresh fix) ---
+        function setupRealtimeListeners() {
+            // Debounced function to fetch and update pages dependent on Orders/Tables
+            const updateOrderDependentPages = debounce(async () => {
+                await Promise.all([
+                    fetchData('tables', 'tables', { order: 'name' }), // For table name changes
+                    fetchAndRenderLiveOrders(),
+                    fetchAndRenderOrderHistory(),
+                ]);
+                console.log('Real-time: Orders and Tables updated.');
+            }, 500); // Debounce to prevent rapid-fire updates
+
+            // Debounced function to fetch and update pages dependent on Menu/Items
+            const updateMenuDependentPages = debounce(async () => {
+                 await fetchAndRenderMenu();
+                 console.log('Real-time: Menu updated.');
+            }, 500);
+            
+            // Listener for core transactional data
+            supabaseClient.channel('live_updates')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, updateOrderDependentPages)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, updateOrderDependentPages)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, updateMenuDependentPages)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, updateMenuDependentPages)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'taxes' }, debounce(fetchData.bind(null, 'taxes', 'taxes'), 500))
+                .subscribe();
         }
 
-        async function fetchAndRenderPromos() {
-            const { data, error } = await supabaseClient.from('promotions').select('*');
-            if(error) return;
-            document.getElementById('promosContainer').innerHTML = data.map(promo => `
-                <tr class="border-b hover:bg-gray-50">
-                    <td class="p-4 font-mono bg-gray-100 rounded">${promo.code}</td><td class="p-4">${promo.discount_percent}%</td>
-                    <td class="p-4"><input type="checkbox" class="promo-active-toggle" data-id="${promo.id}" ${promo.is_active ? 'checked' : ''}></td>
-                    <td class="p-4 space-x-2"><button class="edit-promo-btn text-blue-600" data-id="${promo.id}" data-code="${promo.code}" data-discount="${promo.discount_percent}">Edit</button><button class="delete-promo-btn text-red-600" data-id="${promo.id}">Delete</button></td>
-                </tr>`).join('');
-        }
-        
-        // --- UI RENDERING FUNCTIONS ---
-        function renderMenu() {
-            document.getElementById('menuContainer').innerHTML = categoriesCache.map(category => `
+        // --- UI RENDERING ---
+        const renderSettings = () => {
+            const s = restaurantSettings;
+            document.getElementById('restaurantName').value = s.name || '';
+            document.getElementById('restaurantCurrency').value = s.currency_symbol || '₹';
+            document.getElementById('welcomeMessage').value = s.welcome_message || '';
+            document.getElementById('logoUrl').value = s.logo_url || '';
+            document.getElementById('googleBusinessLink').value = s.google_business_url || '';
+            document.getElementById('restaurantNameSidebar').textContent = s.name || 'Admin Panel';
+            document.getElementById('replyOnGoogleBtn').href = s.google_business_url || '#';
+        };
+
+        const renderMenu = () => {
+            document.getElementById('menuContainer').innerHTML = caches.categories.map(category => `
                 <div class="bg-white p-6 rounded-xl shadow-md">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-2xl font-bold text-gray-800">${category.name}</h3>
+                        <h3 class="text-2xl font-bold text-gray-800">${htmlEscape(category.name)}</h3>
                         <div class="space-x-2">
-                            <button class="edit-category-btn text-blue-500 hover:text-blue-700 p-2" data-id="${category.id}" data-name="${category.name}"><i data-lucide="edit"></i></button>
+                            <button class="edit-category-btn text-blue-500 hover:text-blue-700 p-2" data-id="${category.id}" data-name="${htmlEscape(category.name)}"><i data-lucide="edit"></i></button>
                             <button class="delete-category-btn text-red-500 hover:text-red-700 p-2" data-id="${category.id}"><i data-lucide="trash-2"></i></button>
                         </div>
                     </div>
                     <div class="space-y-4">
                         ${(category.items || []).map(item => `
                             <div class="flex items-center justify-between border-t pt-4">
-                                <div class="flex items-center"><img src="${item.image_url || 'https://placehold.co/100x100/FACC15/1F2937?text=Food'}" class="w-16 h-16 rounded-lg object-cover mr-4">
-                                    <div><p class="font-bold text-lg">${item.name} ${!item.is_available ? '<span class="text-xs bg-red-100 text-red-700 p-1 rounded">Unavailable</span>' : ''}</p>
-                                        <p class="text-sm text-gray-500">${item.description || ''}</p>
-                                        <p class="font-semibold text-gray-700">${restaurantSettings.currency_symbol}${item.price}</p>
+                                <div class="flex items-center"><img src="${item.image_url || 'https://placehold.co/100x100/FACC15/1F2937?text=Food'}" class="w-16 h-16 rounded-lg object-cover mr-4" onerror="this.onerror=null;this.src='https://placehold.co/100x100/FACC15/1F2937?text=Food';">
+                                    <div><p class="font-bold text-lg">${htmlEscape(item.name)} ${!item.is_available ? '<span class="text-xs bg-red-100 text-red-700 p-1 rounded">Unavailable</span>' : ''}</p>
+                                        <p class="text-sm text-gray-500">${htmlEscape(item.description) || ''}</p>
+                                        <p class="font-semibold text-gray-700">${restaurantSettings.currency_symbol || '₹'}${item.price}</p>
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2">
                                      <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" value="" class="sr-only peer item-availability-toggle" data-id="${item.id}" ${item.is_available ? 'checked' : ''}><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-green-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div></label>
-                                    <button class="edit-item-btn p-2 text-gray-600 hover:text-blue-600" data-item='${JSON.stringify(item)}'><i data-lucide="edit"></i></button>
+                                    <button class="edit-item-btn p-2 text-gray-600 hover:text-blue-600" data-id="${item.id}"><i data-lucide="edit"></i></button>
                                 </div>
                             </div>`).join('') || '<p class="text-gray-400 italic">No items in this category yet.</p>'}
                     </div>
                     <button class="add-item-btn mt-4 w-full border-2 border-dashed border-gray-300 hover:border-blue-500 hover:text-blue-500 text-gray-500 p-3 rounded-lg transition" data-category-id="${category.id}">+ Add New Item</button>
                 </div>`).join('');
             lucide.createIcons();
-        }
-        
-        function renderTables() {
-            document.getElementById('tablesContainer').innerHTML = tablesCache.map(table => `
+        };
+
+        const renderTables = () => {
+             document.getElementById('tablesContainer').innerHTML = caches.tables.map(table => `
                 <div class="bg-white p-6 rounded-xl shadow-md text-center">
-                    <p class="text-xl font-bold">${table.name}</p>
+                    <p class="text-xl font-bold">${htmlEscape(table.name)}</p>
                     <div class="mt-4 space-x-2">
-                        <button class="show-qr-btn bg-yellow-400 px-4 py-2 rounded-lg font-semibold" data-id="${table.id}" data-name="${table.name}">Show QR</button>
+                        <button class="show-qr-btn bg-yellow-400 px-4 py-2 rounded-lg font-semibold" data-id="${table.id}" data-name="${htmlEscape(table.name)}">Show QR</button>
                         <button class="delete-table-btn text-red-500" data-id="${table.id}">Delete</button>
                     </div>
                 </div>`).join('');
-        }
+        };
 
-        function renderLiveOrders() {
-            const liveOrders = ordersCache.filter(o => o.status === 'pending' || o.status === 'preparing');
+        const renderLiveOrders = () => {
+            const liveOrders = caches.orders.filter(o => o.status === 'pending' || o.status === 'preparing');
             const container = document.getElementById('liveOrdersContainer');
             if (liveOrders.length === 0) {
                 container.innerHTML = `<p class="text-gray-500 col-span-full">Awaiting new orders...</p>`; return;
             }
             container.innerHTML = liveOrders.map(order => {
-                const tableName = tablesCache.find(t => t.id === order.table_id)?.name || 'Unknown Table';
+                const tableName = caches.tables.find(t => t.id === order.table_id)?.name || 'Unknown Table';
                 const timeSince = Math.floor((new Date() - new Date(order.created_at)) / 60000);
-                
                 let statusBadge = '';
-                if (order.status === 'pending') {
-                    statusBadge = `<span class="text-xs font-semibold bg-red-100 text-red-800 px-2 py-1 rounded-full">New</span>`;
-                } else if (order.status === 'preparing') {
-                    statusBadge = `<span class="text-xs font-semibold bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Preparing</span>`;
-                }
-
+                if (order.status === 'pending') statusBadge = `<span class="text-xs font-semibold bg-red-100 text-red-800 px-2 py-1 rounded-full">New</span>`;
+                else if (order.status === 'preparing') statusBadge = `<span class="text-xs font-semibold bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Preparing</span>`;
                 return `
                 <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 ${order.status === 'pending' ? 'border-red-500' : 'border-yellow-500'}">
                     <div class="flex justify-between items-center">
-                        <h4 class="text-xl font-bold">${tableName}</h4>
-                        <div class="flex items-center space-x-2">
-                           ${statusBadge}
-                           <span class="text-sm font-semibold bg-gray-200 text-gray-700 px-2 py-1 rounded-full">${timeSince}m ago</span>
-                        </div>
+                        <h4 class="text-xl font-bold">${htmlEscape(tableName)}</h4>
+                        <div class="flex items-center space-x-2">${statusBadge}<span class="text-sm font-semibold bg-gray-200 text-gray-700 px-2 py-1 rounded-full">${timeSince}m ago</span></div>
                     </div>
-                    <div class="my-4 space-y-2 border-t border-b py-2">${order.order_details.items.map(i => `<p><span class="font-bold">${i.quantity}x</span> ${i.name}</p>`).join('')}</div>
+                    <div class="my-4 space-y-2 border-t border-b py-2">${(order.order_details.items || []).map(i => `<p><span class="font-bold">${i.quantity}x</span> ${htmlEscape(i.name)}</p>`).join('')}</div>
                     <div class="flex space-x-2">
-                        ${order.status === 'pending' ? `<button class="update-order-status-btn flex-1 bg-yellow-500 text-white p-2 rounded-lg" data-id="${order.id}" data-status="preparing">Start Preparing</button>` : ''}
-                        ${order.status === 'preparing' ? `<button class="update-order-status-btn flex-1 bg-green-500 text-white p-2 rounded-lg" data-id="${order.id}" data-status="completed">Mark as Completed</button>` : ''}
-                        <button class="update-order-status-btn bg-gray-500 text-white p-2 rounded-lg" data-id="${order.id}" data-status="cancelled">Cancel</button>
+                        ${order.status === 'pending' ? `<button class="update-order-status-btn flex-1 bg-yellow-500 text-white p-2 rounded-lg hover:bg-yellow-600" data-id="${order.id}" data-status="preparing">Start Preparing</button>` : ''}
+                        ${order.status === 'preparing' ? `<button class="update-order-status-btn flex-1 bg-green-500 text-white p-2 rounded-lg hover:bg-green-600" data-id="${order.id}" data-status="completed">Mark as Completed</button>` : ''}
+                        <button class="update-order-status-btn bg-gray-500 text-white p-2 rounded-lg hover:bg-gray-600" data-id="${order.id}" data-status="cancelled">Cancel</button>
                     </div>
                 </div>`
             }).join('');
-        }
-        
-        function renderOrderHistory() {
-            const historyOrders = ordersCache.filter(o => o.status === 'completed' || o.status === 'cancelled');
+        };
+
+        const renderOrderHistory = () => {
+            const historyOrders = caches.orders.filter(o => o.status === 'completed' || o.status === 'cancelled');
             document.getElementById('historyContainer').innerHTML = historyOrders.map(order => {
-                const tableName = tablesCache.find(t => t.id === order.table_id)?.name || 'Unknown';
-                const orderIdDisplay = `${tableName.replace(' ','-')}-${order.id.substring(0,6)}`;
+                const tableName = caches.tables.find(t => t.id === order.table_id)?.name || 'Unknown';
+                const orderIdDisplay = `${htmlEscape(tableName.replace(' ','-'))}-${order.id.substring(0,6)}`;
+                const total = order.order_details?.total ? order.order_details.total.toFixed(2) : 'N/A';
                 return `
                 <tr class="border-b hover:bg-gray-50">
-                    <td class="p-4 font-mono text-xs">${orderIdDisplay}</td><td class="p-4">${tableName}</td>
-                    <td class="p-4 font-semibold">${restaurantSettings.currency_symbol || '₹'}${order.order_details.total.toFixed(2)}</td>
+                    <td class="p-4 font-mono text-xs">${orderIdDisplay}</td><td class="p-4">${htmlEscape(tableName)}</td>
+                    <td class="p-4 font-semibold">${restaurantSettings.currency_symbol || '₹'}${total}</td>
                     <td class="p-4"><span class="px-2 py-1 text-xs rounded-full ${order.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${order.payment_status}</span></td>
                     <td class="p-4">${new Date(order.created_at).toLocaleString()}</td>
                     <td class="p-4">
-                        <button class="generate-invoice-btn text-blue-600" data-order-id="${order.id}">Invoice</button>
-                        <button class="delete-order-btn text-red-600 ml-2" data-order-id="${order.id}">Delete</button>
+                        <button class="generate-invoice-btn text-blue-600 hover:text-blue-800" data-order-id="${order.id}">Invoice</button>
+                        <button class="delete-order-btn text-red-600 hover:text-red-800 ml-2" data-order-id="${order.id}">Delete</button>
                     </td>
                 </tr>`}).join('');
-        }
+        };
+        
+        const renderTaxes = () => {
+            document.getElementById('taxesContainer').innerHTML = caches.taxes.map(tax => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-4 font-medium">${htmlEscape(tax.name)}</td><td class="p-4">${tax.rate_percent}%</td>
+                    <td class="p-4"><input type="checkbox" class="tax-enabled-toggle" data-id="${tax.id}" ${tax.is_enabled ? 'checked' : ''}></td>
+                    <td class="p-4 space-x-2"><button class="edit-tax-btn text-blue-600" data-id="${tax.id}" data-name="${htmlEscape(tax.name)}" data-rate="${tax.rate_percent}">Edit</button><button class="delete-tax-btn text-red-600" data-id="${tax.id}">Delete</button></td>
+                </tr>`).join('');
+        };
 
-        async function renderDashboardData() {
+        const renderPromos = () => {
+            document.getElementById('promosContainer').innerHTML = caches.promos.map(promo => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-4 font-mono bg-gray-100 rounded">${htmlEscape(promo.code)}</td><td class="p-4">${promo.discount_percent}%</td>
+                    <td class="p-4"><input type="checkbox" class="promo-active-toggle" data-id="${promo.id}" ${promo.is_active ? 'checked' : ''}></td>
+                    <td class="p-4 space-x-2"><button class="edit-promo-btn text-blue-600" data-id="${promo.id}" data-code="${htmlEscape(promo.code)}" data-discount="${promo.discount_percent}">Edit</button><button class="delete-promo-btn text-red-600" data-id="${promo.id}">Delete</button></td>
+                </tr>`).join('');
+        };
+
+        const renderSlideshow = () => {
+            document.getElementById('slideshowContainer').innerHTML = caches.slideshow.map(image => `
+                <div class="relative group">
+                    <img src="${image.image_url}" onerror="this.onerror=null;this.src='https://placehold.co/400x200/4C51BF/FFFFFF?text=Image';" class="w-full h-48 object-cover rounded-lg shadow-md">
+                    <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="delete-slideshow-btn text-white p-3 bg-red-600/80 rounded-full" data-id="${image.id}" data-url="${image.image_url}"><i data-lucide="trash-2"></i></button>
+                    </div>
+                </div>`).join('') || '<p>No slideshow images uploaded.</p>';
+            lucide.createIcons();
+        };
+
+        const renderOffers = () => {
+            document.getElementById('offersContainer').innerHTML = caches.offers.map(offer => `
+                <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                    <img src="${offer.image_url || 'https://placehold.co/400x200/FF7F50/FFFFFF?text=Offer'}" onerror="this.onerror=null;this.src='https://placehold.co/400x200/FF7F50/FFFFFF?text=Offer';" class="w-full h-40 object-cover">
+                    <div class="p-4">
+                        <div class="flex justify-between items-start">
+                            <h4 class="text-lg font-bold">${htmlEscape(offer.title)}</h4>
+                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" class="sr-only peer offer-active-toggle" data-id="${offer.id}" ${offer.is_active ? 'checked' : ''}><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div></label>
+                        </div>
+                        <p class="text-sm text-gray-600 mt-1">${htmlEscape(offer.description) || ''}</p>
+                        <div class="text-right mt-4 space-x-2">
+                            <button class="edit-offer-btn text-blue-600 font-semibold" data-id="${offer.id}">Edit</button>
+                            <button class="delete-offer-btn text-red-600 font-semibold" data-id="${offer.id}">Delete</button>
+                        </div>
+                    </div>
+                </div>`).join('') || '<p>No offers created yet.</p>';
+            lucide.createIcons();
+        };
+
+        const renderAnalytics = async (fullRender = true) => {
+            const completedOrders = caches.orders.filter(o => o.status === 'completed');
             const today = new Date(); today.setHours(0,0,0,0);
-            const todaysOrders = ordersCache.filter(o => new Date(o.created_at) > today && o.status === 'completed');
-            const revenue = todaysOrders.reduce((sum, o) => sum + o.order_details.total, 0);
+            const todaysOrders = completedOrders.filter(o => new Date(o.created_at) > today);
+            const revenue = todaysOrders.reduce((sum, o) => sum + (o.order_details?.total || 0), 0);
             
             document.getElementById('dailyRevenue').textContent = `${restaurantSettings.currency_symbol || '₹'}${revenue.toFixed(2)}`;
             document.getElementById('dailyOrders').textContent = todaysOrders.length;
-            document.getElementById('pendingOrders').textContent = ordersCache.filter(o => ['pending', 'preparing'].includes(o.status)).length;
+            document.getElementById('pendingOrders').textContent = caches.orders.filter(o => ['pending', 'preparing'].includes(o.status)).length;
             
             const turnTimes = todaysOrders.filter(o => o.closed_at).map(o => (new Date(o.closed_at) - new Date(o.created_at)) / 1000);
             const avgTime = turnTimes.length ? turnTimes.reduce((a,b) => a+b, 0) / turnTimes.length : 0;
             const minutes = Math.floor(avgTime / 60); const seconds = Math.floor(avgTime % 60);
             document.getElementById('avgTurnTime').textContent = `${minutes}m ${seconds}s`;
-        }
 
-        async function renderAnalytics() {
-            await renderDashboardData();
-            renderMenuItemPerformance();
-            renderDailySales();
-            renderTableSales();
-            renderActivityLog();
-        }
+            if (!fullRender) return; // Only update metrics, skip expensive chart redraws unless explicitly requested (e.g., initial load)
 
-        function renderMenuItemPerformance() {
             const itemCounts = {};
-            ordersCache.forEach(order => {
-                if (order.status === 'completed') { order.order_details.items.forEach(item => { itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity; }); }
-            });
-            const sortedItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
-            const ctx = document.getElementById('menuPerformanceChart').getContext('2d');
-            if (menuPerformanceChart) menuPerformanceChart.destroy();
-            menuPerformanceChart = new Chart(ctx, { type: 'bar', data: { labels: sortedItems.map(item => item[0]), datasets: [{ label: 'Units Sold', data: sortedItems.map(item => item[1]), backgroundColor: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }] }, options: { indexAxis: 'y', responsive: true } });
-        }
-        
-        function renderDailySales() {
-            const salesByDay = {};
-            for(let i=6; i>=0; i--) { const d = new Date(); d.setDate(d.getDate() - i); salesByDay[d.toLocaleDateString()] = 0; }
-            ordersCache.forEach(order => {
-                if(order.status === 'completed') { const orderDate = new Date(order.created_at).toLocaleDateString(); if(salesByDay.hasOwnProperty(orderDate)) { salesByDay[orderDate] += order.order_details.total; } }
-            });
-            const ctx = document.getElementById('dailySalesChart').getContext('2d');
-            if (dailySalesChart) dailySalesChart.destroy();
-            dailySalesChart = new Chart(ctx, { type: 'line', data: { labels: Object.keys(salesByDay), datasets: [{ label: 'Daily Revenue', data: Object.values(salesByDay), fill: false, borderColor: 'rgba(75, 192, 192, 1)', tension: 0.1 }] } });
-        }
-        
-         function renderTableSales() {
-            const salesByTable = {};
-            ordersCache.forEach(order => {
-                if (order.status === 'completed') { const tableName = tablesCache.find(t => t.id === order.table_id)?.name || 'Unknown'; salesByTable[tableName] = (salesByTable[tableName] || 0) + order.order_details.total; }
-            });
-            const sortedTables = Object.entries(salesByTable).sort((a, b) => b[1] - a[1]);
-            const ctx = document.getElementById('tableSalesChart').getContext('2d');
-            if (tableSalesChart) tableSalesChart.destroy();
-            tableSalesChart = new Chart(ctx, { type: 'doughnut', data: { labels: sortedTables.map(table => table[0]), datasets: [{ label: 'Revenue by Table', data: sortedTables.map(table => table[1]), backgroundColor: ['rgba(255, 99, 132, 0.7)','rgba(54, 162, 235, 0.7)','rgba(255, 206, 86, 0.7)','rgba(75, 192, 192, 0.7)','rgba(153, 102, 255, 0.7)','rgba(255, 159, 64, 0.7)'], }] }, options: { responsive: true } });
-        }
-
-        async function renderActivityLog() {
-            const { data, error } = await supabaseClient.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(20);
-            if(error) return;
-            document.getElementById('activityLogContainer').innerHTML = data.map(log => `
-                <tr class="hover:bg-gray-50"><td class="p-3 text-gray-500">${new Date(log.created_at).toLocaleString()}</td><td class="p-3 font-medium">${log.admin_email}</td><td class="p-3">${log.action}</td></tr>`).join('');
-        }
-
-        function generateAndShowInvoice(order) {
-            if (!order) return;
-            const tableName = tablesCache.find(t => t.id === order.table_id)?.name || 'N/A';
-            const orderIdDisplay = `${tableName.replace(' ','-')}-${order.id.substring(0,6)}`;
-            
-            const invoiceContent = document.getElementById('invoiceContent');
-            invoiceContent.dataset.orderId = orderIdDisplay;
-            invoiceContent.innerHTML = `
-                <div class="flex justify-between items-center mb-8">
-                    <div><img src="${restaurantSettings.logo_url || 'https://placehold.co/150x50/1F2937/FFFFFF?text=Logo'}" alt="Logo" class="h-12"><h1 class="text-2xl font-bold mt-2">${restaurantSettings.name}</h1></div>
-                    <div class="text-right"><h2 class="text-xl font-bold">Invoice</h2><p><strong>Order ID:</strong> ${orderIdDisplay}</p><p><strong>Date:</strong> ${new Date(order.created_at).toLocaleDateString()}</p></div>
-                </div>
-                <p class="mb-4"><strong>Table:</strong> ${tableName}</p>
-                <table class="w-full text-left mb-8">
-                    <thead><tr class="bg-gray-100"><th class="p-2">Item</th><th class="p-2">Qty</th><th class="p-2 text-right">Price</th><th class="p-2 text-right">Total</th></tr></thead>
-                    <tbody>${order.order_details.items.map(i => `<tr><td class="p-2 border-b">${i.name}</td><td class="p-2 border-b">${i.quantity}</td><td class="p-2 border-b text-right">${i.price.toFixed(2)}</td><td class="p-2 border-b text-right">${(i.price * i.quantity).toFixed(2)}</td></tr>`).join('')}</tbody>
-                </table>
-                <div class="flex justify-end"><div class="w-1/2">
-                        <div class="flex justify-between"><p>Subtotal:</p><p>${order.order_details.subtotal.toFixed(2)}</p></div>
-                        ${order.order_details.taxes.map(t => `<div class="flex justify-between"><p>${t.name} (${t.rate_percent}%):</p><p>${t.amount.toFixed(2)}</p></div>`).join('')}
-                        <div class="flex justify-between font-bold text-xl mt-2 border-t pt-2"><p>Total:</p><p>${restaurantSettings.currency_symbol}${order.order_details.total.toFixed(2)}</p></div>
-                </div></div>`;
-            document.getElementById('invoiceModal').classList.add('active');
-            lucide.createIcons();
-        }
-
-        // --- EVENT LISTENERS SETUP ---
-        function setupEventListeners() {
-            document.getElementById('mainNav').addEventListener('click', (e) => {
-                if (e.target.tagName === 'A') {
-                    e.preventDefault();
-                    const targetId = e.target.getAttribute('href').substring(1);
-                    document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
-                    document.getElementById(targetId).classList.remove('hidden');
-                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                    e.target.classList.add('active');
+            completedOrders.forEach(order => {
+                if (order.order_details && order.order_details.items) { 
+                    order.order_details.items.forEach(item => { 
+                        // Use htmlEscape for item names in charts too
+                        const itemName = htmlEscape(item.name);
+                        itemCounts[itemName] = (itemCounts[itemName] || 0) + item.quantity; 
+                    }); 
                 }
             });
 
-            document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => btn.closest('.modal').classList.remove('active')));
+            renderChart('menuPerformanceChart', 'bar', {
+                labels: Object.keys(itemCounts),
+                datasets: [{ label: 'Units Sold', data: Object.values(itemCounts), backgroundColor: 'rgba(54, 162, 235, 0.6)' }]
+            }, { indexAxis: 'y' });
+            
+            const salesByDay = {};
+            for(let i=6; i>=0; i--) { const d = new Date(); d.setDate(d.getDate() - i); salesByDay[d.toLocaleDateString()] = 0; }
+            completedOrders.forEach(order => {
+                const total = order.order_details?.total || 0;
+                const orderDate = new Date(order.created_at).toLocaleDateString(); 
+                if(salesByDay.hasOwnProperty(orderDate)) { salesByDay[orderDate] += total; }
+            });
+             renderChart('dailySalesChart', 'line', {
+                labels: Object.keys(salesByDay),
+                datasets: [{ label: 'Daily Revenue', data: Object.values(salesByDay), borderColor: 'rgba(75, 192, 192, 1)', tension: 0.1 }]
+            });
 
-            document.getElementById('addCategoryBtn').addEventListener('click', () => {
+            const salesByTable = {};
+            completedOrders.forEach(order => {
+                const tableName = caches.tables.find(t => t.id === order.table_id)?.name || 'Unknown'; 
+                const total = order.order_details?.total || 0;
+                salesByTable[htmlEscape(tableName)] = (salesByTable[htmlEscape(tableName)] || 0) + total;
+            });
+            renderChart('tableSalesChart', 'doughnut', {
+                labels: Object.keys(salesByTable),
+                datasets: [{ label: 'Revenue by Table', data: Object.values(salesByTable), backgroundColor: ['rgba(255, 99, 132, 0.7)','rgba(54, 162, 235, 0.7)','rgba(255, 206, 86, 0.7)','rgba(75, 192, 192, 0.7)'] }]
+            });
+
+            const { data, error } = await supabaseClient.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(20);
+            if(error) return;
+            document.getElementById('activityLogContainer').innerHTML = data.map(log => `
+                <tr class="hover:bg-gray-50"><td class="p-3 text-gray-500">${new Date(log.created_at).toLocaleString()}</td><td class="p-3 font-medium">${htmlEscape(log.admin_email)}</td><td class="p-3">${htmlEscape(log.action)}</td></tr>`).join('');
+        };
+
+        function renderChart(canvasId, type, data, options = {}) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+            chartInstances[canvasId] = new Chart(ctx, { type, data, options: { responsive: true, ...options } });
+        }
+        
+        function generateAndShowInvoice(orderId) {
+            const order = caches.orders.find(o => o.id === orderId);
+            if (!order || !order.order_details) return showToast('Order details not found.', true);
+
+            const currency = restaurantSettings.currency_symbol || '₹';
+            const restaurantName = htmlEscape(restaurantSettings.name) || 'Restaurant Invoice';
+            const restaurantAddress = htmlEscape(restaurantSettings.address) || 'Your Restaurant Address Here'; // Assuming you might add address later
+            const restaurantGST = htmlEscape(restaurantSettings.gst_number) || 'GST/TAX ID: N/A'; // Assuming you might add GST later
+            
+            const tableName = caches.tables.find(t => t.id === order.table_id)?.name || 'N/A';
+            const orderIdDisplay = `${htmlEscape(tableName.replace(' ','-'))}-${order.id.substring(0,6)}`;
+            const subtotal = order.order_details.subtotal?.toFixed(2) || '0.00';
+            const total = order.order_details.total?.toFixed(2) || '0.00';
+            
+            const invoiceContent = document.getElementById('invoiceContent');
+            invoiceContent.dataset.orderId = orderIdDisplay;
+            
+            // --- UPDATED INVOICE TEMPLATE FOR EDITABILITY ---
+            invoiceContent.innerHTML = `
+                <div class="invoice-container p-6 bg-white">
+                    <!-- Header -->
+                    <div class="flex justify-between items-start border-b border-gray-400 pb-4 mb-4">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-800 editable-text" contenteditable="true">${restaurantName}</h1>
+                            <p class="text-sm text-gray-600 mt-1 editable-text" contenteditable="true">${restaurantAddress}</p>
+                            <p class="text-sm text-gray-600 editable-text" contenteditable="true">${restaurantGST}</p>
+                        </div>
+                        <img src="${restaurantSettings.logo_url || 'https://placehold.co/80x40/1F2937/FFFFFF?text=Logo'}" onerror="this.onerror=null;this.src='https://placehold.co/80x40/1F2937/FFFFFF?text=Logo';" alt="Logo" class="h-10 w-auto object-contain">
+                    </div>
+
+                    <!-- Invoice Details -->
+                    <div class="flex justify-between text-sm mb-6">
+                        <div>
+                            <p class="font-bold editable-text" contenteditable="true">INVOICE</p>
+                            <p># <span class="editable-text" contenteditable="true">${orderIdDisplay}</span></p>
+                        </div>
+                        <div class="text-right">
+                            <p><strong>Date:</strong> <span class="editable-text" contenteditable="true">${new Date(order.created_at).toLocaleDateString()}</span></p>
+                            <p><strong>Time:</strong> <span class="editable-text" contenteditable="true">${new Date(order.created_at).toLocaleTimeString()}</span></p>
+                            <p><strong>Table:</strong> <span class="editable-text" contenteditable="true">${htmlEscape(tableName)}</span></p>
+                        </div>
+                    </div>
+
+                    <!-- Line Items Table -->
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 border-b border-gray-300">
+                                <th class="p-2 font-semibold w-1/2">Item</th>
+                                <th class="p-2 font-semibold text-center">Qty</th>
+                                <th class="p-2 font-semibold text-right">Price (${currency})</th>
+                                <th class="p-2 font-semibold text-right">Total (${currency})</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${order.order_details.items.map(i => `
+                            <tr class="border-b border-gray-200">
+                                <td class="p-2 editable-text" contenteditable="true">${htmlEscape(i.name)}</td>
+                                <td class="p-2 text-center editable-text" contenteditable="true">${i.quantity}</td>
+                                <td class="p-2 text-right editable-text" contenteditable="true">${i.price.toFixed(2)}</td>
+                                <td class="p-2 text-right editable-text" contenteditable="true">${(i.price * i.quantity).toFixed(2)}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+
+                    <!-- Totals and Taxes -->
+                    <div class="flex justify-end mt-4">
+                        <div class="w-full max-w-xs space-y-1 text-sm">
+                            <div class="flex justify-between border-b pb-1">
+                                <p>Subtotal:</p>
+                                <p class="editable-text" contenteditable="true">${currency}${subtotal}</p>
+                            </div>
+                            ${(order.order_details.taxes || []).map(t => `
+                            <div class="flex justify-between text-gray-600">
+                                <p class="editable-text" contenteditable="true">${htmlEscape(t.name)} (${t.rate_percent}%):</p>
+                                <p class="editable-text" contenteditable="true">${currency}${t.amount.toFixed(2)}</p>
+                            </div>`).join('')}
+                            <div class="flex justify-between font-bold text-lg border-t-2 border-black pt-2 mt-2">
+                                <p>GRAND TOTAL:</p>
+                                <p class="editable-text" contenteditable="true">${currency}${total}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer Message -->
+                    <div class="text-center text-xs text-gray-500 mt-8 pt-4 border-t border-dashed border-gray-300">
+                        <p class="editable-text" contenteditable="true">Thank you for dining with us!</p>
+                        <p class="editable-text" contenteditable="true">${htmlEscape(restaurantSettings.welcome_message) || ''}</p>
+                    </div>
+                </div>`;
+            document.getElementById('invoiceModal').classList.add('active');
+        }
+
+        // --- EVENT LISTENERS SETUP ---
+
+        // Helper functions moved up to fix ReferenceError
+        // Uploads Fix: Validation
+        const validateFileUpload = (file) => {
+             const maxSizeBytes = 2 * 1024 * 1024; // 2MB
+             const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+
+             if (file.size > maxSizeBytes) return 'File size must be 2MB or less.';
+             if (!validTypes.includes(file.type)) return 'Only PNG, JPG, and WEBP images are allowed.';
+             return null;
+        };
+
+        // Uploads Fix: Random file name and separate bucket for slideshow
+        const handleFileUpload = async (file, bucket = 'item-images') => {
+            if (!file) return { data: null, error: null };
+            const fileExtension = file.name.split('.').pop();
+            const filePath = `public/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`; // random file name fix
+            
+            const { error: uploadError } = await supabaseClient.storage.from(bucket).upload(filePath, file);
+            if (uploadError) { return { data: null, error: uploadError }; }
+            
+            const { data } = supabaseClient.storage.from(bucket).getPublicUrl(filePath);
+            return { data: { publicUrl: data.publicUrl, path: filePath }, error: null };
+        };
+
+        function setupInvoiceListeners() {
+             // Download PDF Button Fix (Download PDF btn – dead fix)
+            document.getElementById('downloadPdfBtn').addEventListener('click', async () => {
+                const input = document.getElementById('invoiceContent');
+                const orderId = input.dataset.orderId || 'Invoice';
+                showToast('Generating PDF...');
+
+                // Temporarily remove editable borders for clean PDF render
+                input.querySelectorAll('[contenteditable="true"]').forEach(el => el.style.border = 'none');
+
+
+                const canvas = await html2canvas(input, { scale: 2, useCORS: true, logging: false });
+                const imgData = canvas.toDataURL('image/png');
+                
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                
+                const imgProps = pdf.getImageProperties(imgData);
+                const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+                heightLeft -= pdfHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+                    heightLeft -= pdfHeight;
+                }
+                
+                pdf.save(`${orderId}.pdf`);
+                showToast('PDF Downloaded!');
+                logActivity(`Downloaded PDF for order ${orderId}`);
+                
+                // Restore editable borders
+                input.querySelectorAll('[contenteditable="true"]').forEach(el => el.style.border = '');
+            });
+
+            document.getElementById('printInvoiceBtn').addEventListener('click', () => {
+                logActivity(`Printing invoice`);
+                document.body.classList.add('printing-invoice');
+                window.print();
+            });
+             window.addEventListener('afterprint', () => {
+                // Remove the class after printing is done (or print dialog is closed)
+                document.body.classList.remove('printing-invoice');
+                document.getElementById('invoiceModal').classList.remove('active');
+             });
+        }
+        
+        function setupMenuListeners() {
+             document.getElementById('addCategoryBtn').addEventListener('click', () => {
                 document.getElementById('categoryId').value = '';
                 document.getElementById('categoryNameInput').value = '';
                 document.getElementById('categoryModal').classList.add('active');
@@ -615,12 +796,17 @@
                 const id = document.getElementById('categoryId').value;
                 const name = document.getElementById('categoryNameInput').value;
                 if (!name) return showToast('Category name is required.', true);
+                
+                const actionText = id ? `Updated category: ${name}` : `Created category: ${name}`;
                 const { error } = id ? await supabaseClient.from('categories').update({ name }).eq('id', id) : await supabaseClient.from('categories').insert({ name });
-                if (error) { showToast('Error saving category.', true); } else {
+                
+                if (error) { 
+                    showToast('Error saving category: ' + error.message, true); 
+                } else {
                     showToast(`Category ${id ? 'updated' : 'added'}!`);
                     document.getElementById('categoryModal').classList.remove('active');
-                    await logActivity(`${id ? 'Updated' : 'Created'} category: ${name}`);
-                    fetchAndRenderMenu();
+                    logActivity(actionText);
+                    await fetchAndRenderMenu();
                 }
             });
 
@@ -630,14 +816,22 @@
                 const deleteBtn = e.target.closest('.delete-category-btn');
                 const addBtn = e.target.closest('.add-item-btn');
                 const editItemBtn = e.target.closest('.edit-item-btn');
+                
                 if (editBtn) {
                     document.getElementById('categoryId').value = editBtn.dataset.id;
                     document.getElementById('categoryNameInput').value = editBtn.dataset.name;
                     document.getElementById('categoryModal').classList.add('active');
                 }
-                if (deleteBtn && confirm('Are you sure you want to delete this category and all its items?')) {
-                    const { error } = await supabaseClient.from('categories').delete().eq('id', deleteBtn.dataset.id);
-                    if(error) showToast('Error deleting category.', true); else { showToast('Category deleted.'); logActivity(`Deleted category ID ${deleteBtn.dataset.id}`); fetchAndRenderMenu(); }
+                if (deleteBtn) {
+                    promptForDelete('Delete this category and all its items?', async () => {
+                        const { error } = await supabaseClient.from('categories').delete().eq('id', deleteBtn.dataset.id);
+                        if(error) showToast('Error deleting category.', true); 
+                        else { 
+                            showToast('Category deleted.'); 
+                            logActivity(`Deleted category ID ${deleteBtn.dataset.id}`);
+                            await fetchAndRenderMenu();
+                        }
+                    });
                 }
                 if(addBtn) {
                     document.getElementById('itemId').value = ''; document.getElementById('itemCategoryId').value = addBtn.dataset.categoryId;
@@ -646,10 +840,15 @@
                     document.getElementById('itemModal').classList.add('active');
                 }
                  if(editItemBtn) {
-                    const item = JSON.parse(editItemBtn.dataset.item);
+                    const itemId = editItemBtn.dataset.id; // Edit Item bug fix: Use data-id
+                    const item = caches.items.get(itemId);
+                    if (!item) return showToast('Error: Item data not found in cache.', true);
+
                     document.getElementById('itemId').value = item.id; document.getElementById('itemCategoryId').value = item.category_id;
                     document.getElementById('itemNameInput').value = item.name; document.getElementById('itemDescInput').value = item.description; document.getElementById('itemPriceInput').value = item.price;
-                    document.getElementById('itemImageInput').value = ''; const preview = document.getElementById('itemImagePreview');
+                    document.getElementById('itemImageInput').value = ''; 
+                    const preview = document.getElementById('itemImagePreview');
+                    
                     if(item.image_url) { preview.src = item.image_url; preview.classList.remove('hidden'); } else { preview.classList.add('hidden'); }
                     document.getElementById('itemModalTitle').textContent = 'Edit Item';
                     document.getElementById('itemModal').classList.add('active');
@@ -658,248 +857,483 @@
             menuContainer.addEventListener('change', async e => {
                 if (e.target.classList.contains('item-availability-toggle')) {
                     const id = e.target.dataset.id; const is_available = e.target.checked;
-                    await supabaseClient.from('items').update({ is_available }).eq('id', id); logActivity(`Set item ${id} availability to ${is_available}`);
+                    await supabaseClient.from('items').update({ is_available }).eq('id', id); 
+                    logActivity(`Set item ${id} availability to ${is_available}`);
+                    // Realtime listener handles the fetch/render
                 }
             });
             document.getElementById('saveItemBtn').addEventListener('click', async () => {
-                const id = document.getElementById('itemId').value; const category_id = document.getElementById('itemCategoryId').value;
-                const name = document.getElementById('itemNameInput').value; const description = document.getElementById('itemDescInput').value;
-                const price = parseFloat(document.getElementById('itemPriceInput').value); const imageFile = document.getElementById('itemImageInput').files[0];
-                if (!name || isNaN(price)) return showToast('Item name and a valid price are required.', true);
-                let image_url = id ? (categoriesCache.flatMap(c => c.items).find(i => i && i.id === id) || {}).image_url : null;
+                const id = document.getElementById('itemId').value; 
+                const category_id = document.getElementById('itemCategoryId').value;
+                const name = document.getElementById('itemNameInput').value; 
+                const description = document.getElementById('itemDescInput').value;
+                const price = parseFloat(document.getElementById('itemPriceInput').value); 
+                const imageFile = document.getElementById('itemImageInput').files[0];
+                
+                if (!name || isNaN(price) || price <= 0) return showToast('Item name and a valid price (>0) are required.', true);
+                
+                let image_url = id ? (caches.items.get(id) || {}).image_url : null;
+                
                 if (imageFile) {
-                    const filePath = `public/${Date.now()}-${imageFile.name}`;
-                    const { error: uploadError } = await supabaseClient.storage.from('item-images').upload(filePath, imageFile);
-                    if (uploadError) return showToast(`Image upload failed: ${uploadError.message}`, true);
-                    const { data } = supabaseClient.storage.from('item-images').getPublicUrl(filePath); image_url = data.publicUrl;
+                    const validationError = validateFileUpload(imageFile); // Uploads check fix
+                    if (validationError) return showToast(validationError, true);
+
+                    const { data, error } = await handleFileUpload(imageFile, 'item-images');
+                    if (error) return showToast(`Image upload failed: ${error.message}`, true);
+                    image_url = data.publicUrl;
                 }
+
                 const itemData = { name, description, price, category_id, image_url };
+                const actionText = id ? `Updated item: ${name}` : `Created item: ${name}`;
+
                 const { error } = id ? await supabaseClient.from('items').update(itemData).eq('id', id) : await supabaseClient.from('items').insert(itemData);
-                if (error) { showToast(`Error saving item: ${error.message}`, true); } else {
-                    showToast(`Item ${id ? 'updated' : 'added'}!`); document.getElementById('itemModal').classList.remove('active');
-                    logActivity(`${id ? 'Updated' : 'Created'} item: ${name}`); fetchAndRenderMenu();
+                
+                if (error) { 
+                    showToast(`Error saving item: ${error.message}`, true); 
+                } else {
+                    showToast(`Item ${id ? 'updated' : 'added'}!`); // Bug 1 fix: Only show success on success
+                    document.getElementById('itemModal').classList.remove('active');
+                    logActivity(actionText);
+                    await fetchAndRenderMenu();
                 }
             });
-            
+        }
+
+        function setupTableListeners() {
             document.getElementById('addTableBtn').addEventListener('click', () => {
                 document.getElementById('tableId').value = ''; document.getElementById('tableNameInput').value = '';
                 document.getElementById('tableModal').classList.add('active');
             });
             document.getElementById('saveTableBtn').addEventListener('click', async () => {
-                const name = document.getElementById('tableNameInput').value; if(!name) return;
+                const name = document.getElementById('tableNameInput').value; if(!name) return showToast('Table name is required.', true);
                 const { error } = await supabaseClient.from('tables').insert({ name });
-                if(error) showToast('Error saving table', true); else { showToast('Table added!'); document.getElementById('tableModal').classList.remove('active'); logActivity(`Added table: ${name}`); fetchAndRenderTables(); }
+                if(error) {
+                    showToast('Error saving table: ' + error.message, true); 
+                } else { 
+                    showToast('Table added!'); // Bug 1 fix
+                    document.getElementById('tableModal').classList.remove('active'); 
+                    logActivity(`Added table: ${name}`);
+                    await fetchData('tables', 'tables', { order: 'name' });
+                    renderTables();
+                }
             });
             document.getElementById('tablesContainer').addEventListener('click', async e => {
-                 const qrBtn = e.target.closest('.show-qr-btn'); const deleteBtn = e.target.closest('.delete-table-btn');
+                 const qrBtn = e.target.closest('.show-qr-btn'); 
+                 const deleteBtn = e.target.closest('.delete-table-btn');
+
                  if(qrBtn) {
-                    const tableId = qrBtn.dataset.id; const tableName = qrBtn.dataset.name; const qrContainer = document.getElementById('qrcode');
-                    qrContainer.innerHTML = ''; const customerMenuUrl = new URL('customer_menu.html', window.location.href);
+                    const tableId = qrBtn.dataset.id; 
+                    const tableName = qrBtn.dataset.name; 
+                    const qrContainer = document.getElementById('qrcode');
+                    qrContainer.innerHTML = '';
+                    
+                    // --- CLIENT URL FIX ---
+                    const clientBaseUrl = 'https://namoclient.netlify.app/';
+                    const customerMenuUrl = new URL(clientBaseUrl);
+                    customerMenuUrl.hash = `/menu`;
                     customerMenuUrl.searchParams.set('table_id', tableId);
+                    
                     new QRCode(qrContainer, { text: customerMenuUrl.href, width: 256, height: 256 });
                     document.getElementById('qrModalTitle').textContent = `QR Code for ${tableName}`;
+                    document.getElementById('downloadQRBtn').dataset.tableName = tableName;
                     document.getElementById('qrModal').classList.add('active');
                  }
-                 if(deleteBtn && confirm('Are you sure you want to delete this table?')) {
-                    const { error } = await supabaseClient.from('tables').delete().eq('id', deleteBtn.dataset.id);
-                    if(error) showToast('Error deleting table.', true); else { showToast('Table deleted.'); logActivity(`Deleted table ID ${deleteBtn.dataset.id}`); fetchAndRenderTables(); }
+
+                 if(deleteBtn) {
+                    const tableIdToDelete = deleteBtn.dataset.id;
+                    const table = caches.tables.find(t => t.id === tableIdToDelete);
+                    const tableName = htmlEscape(table ? table.name : 'this table');
+
+                    promptForDelete(`Delete table "${tableName}"? This will unlink it from past orders but won't delete the order history itself.`, async () => {
+                        // The foreign key constraint handles setting table_id to NULL on orders
+                        const { error: deleteError } = await supabaseClient
+                            .from('tables')
+                            .delete()
+                            .eq('id', tableIdToDelete);
+
+                        if (deleteError) {
+                            showToast('Error deleting table.', true);
+                        } else {
+                            showToast('Table deleted successfully.');
+                            logActivity(`Deleted table ID ${tableIdToDelete}`);
+                            await fetchData('tables', 'tables', { order: 'name' });
+                            renderTables();
+                        }
+                    });
                  }
             });
+             document.getElementById('downloadQRBtn').addEventListener('click', e => {
+                const qrCanvas = document.querySelector('#qrcode canvas');
+                if (qrCanvas) {
+                    const link = document.createElement('a');
+                    link.download = `${e.target.dataset.tableName}-qr-code.png`;
+                    // Convert canvas to image and trigger download
+                    link.href = qrCanvas.toDataURL('image/png');
+                    link.click();
+                }
+            });
+        }
 
-            document.getElementById('liveOrdersContainer').addEventListener('click', async e => {
+        function setupOrderListeners() {
+             document.getElementById('liveOrdersContainer').addEventListener('click', async e => {
                 const statusBtn = e.target.closest('.update-order-status-btn');
                 if(statusBtn) {
                     statusBtn.disabled = true;
+                    // Loading spinner
                     statusBtn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
                     
-                    const orderId = statusBtn.dataset.id; const newStatus = statusBtn.dataset.status;
+                    const orderId = statusBtn.dataset.id; 
+                    const newStatus = statusBtn.dataset.status;
                     const updateData = { status: newStatus };
-                    if (newStatus === 'completed') { updateData.closed_at = new Date().toISOString(); updateData.payment_status = 'paid'; }
+                    
+                    if (newStatus === 'completed') { 
+                        updateData.closed_at = new Date().toISOString(); 
+                        updateData.payment_status = 'paid'; 
+                    }
+                    
                     const { error } = await supabaseClient.from('orders').update(updateData).eq('id', orderId);
-
-                    if(error) { showToast('Error updating status.', true); } else {
+                    
+                    if(error) { 
+                        showToast('Error updating status.', true); 
+                    } else {
                         showToast(`Order status changed to ${newStatus}`);
                         logActivity(`Updated order ${orderId} to ${newStatus}`);
-                        if (newStatus === 'completed') {
-                            const { data: updatedOrder } = await supabaseClient.from('orders').select('*').eq('id', orderId).single();
-                            generateAndShowInvoice(updatedOrder);
+                        if (newStatus === 'completed') generateAndShowInvoice(orderId);
+                        // Realtime listener handles the fetch/render
+                    }
+                }
+            });
+             document.getElementById('historyContainer').addEventListener('click', e => {
+                const invoiceBtn = e.target.closest('.generate-invoice-btn');
+                const deleteBtn = e.target.closest('.delete-order-btn');
+                if(invoiceBtn) generateAndShowInvoice(invoiceBtn.dataset.orderId);
+                if(deleteBtn) {
+                    const orderId = deleteBtn.dataset.orderId;
+                    promptForDelete('Delete this order from history? (This is permanent)', async () => {
+                        const { error } = await supabaseClient.from('orders').delete().eq('id', orderId);
+                        if (error) showToast('Error deleting order.', true); 
+                        else { 
+                            showToast('Order deleted.'); 
+                            logActivity(`Deleted order ID ${orderId}`);
+                            // Realtime listener handles the fetch/render
                         }
+                    });
+                }
+            });
+        }
+
+        function setupCrudListeners(page, tableName, modalId, addBtnId, saveBtnId, inputIds, dbFields) {
+            const container = document.getElementById(page === 'tax' ? 'taxesContainer' : `${page}sContainer`);
+            document.getElementById(addBtnId).addEventListener('click', () => {
+                document.getElementById(`${page}Id`).value = '';
+                inputIds.forEach(id => document.getElementById(id).value = '');
+                document.getElementById(modalId).classList.add('active');
+            });
+             container.addEventListener('click', e => {
+                const editBtn = e.target.closest(`.edit-${page}-btn`);
+                const deleteBtn = e.target.closest(`.delete-${page}-btn`);
+                if (editBtn) {
+                    document.getElementById(`${page}Id`).value = editBtn.dataset.id;
+                    inputIds.forEach((inputId, i) => {
+                        document.getElementById(inputId).value = editBtn.dataset[dbFields[i]];
+                    });
+                    document.getElementById(modalId).classList.add('active');
+                }
+                if (deleteBtn) {
+                     promptForDelete(`Delete this ${page}?`, async () => {
+                        const { error } = await supabaseClient.from(tableName).delete().eq('id', deleteBtn.dataset.id);
+                        if (error) showToast(`Error deleting ${page}.`, true);
+                        else { 
+                            showToast(`${page} deleted.`); 
+                            logActivity(`Deleted ${page} ID ${deleteBtn.dataset.id}`);
+                            await fetchData(tableName, `${page}s`);
+                            if (page === 'tax') renderTaxes();
+                            else if (page === 'promo') renderPromos();
+                        }
+                    });
+                }
+            });
+            document.getElementById('saveBtnId').addEventListener('click', async () => {
+                const id = document.getElementById(`${page}Id`).value;
+                const record = {};
+                inputIds.forEach((inputId, i) => {
+                    record[dbFields[i]] = document.getElementById(inputId).value;
+                });
+                
+                const actionText = id ? `Updated ${page}` : `Created ${page}`;
+                const { error } = id ? await supabaseClient.from(tableName).update(record).eq('id', id) : await supabaseClient.from(tableName).insert(record);
+                
+                if (error) showToast(`Error saving ${page}: ${error.message}`, true);
+                else { 
+                    showToast(`${page} saved!`); // Bug 1 fix
+                    document.getElementById(modalId).classList.remove('active'); 
+                    logActivity(actionText);
+                    await fetchData(tableName, `${page}s`);
+                    if (page === 'tax') renderTaxes();
+                    else if (page === 'promo') renderPromos();
+                }
+            });
+            const toggleContainer = document.getElementById(page === 'tax' ? 'taxesContainer' : `${page}sContainer`);
+            toggleContainer.addEventListener('change', async e => {
+                 if(e.target.type === 'checkbox') {
+                     const id = e.target.dataset.id;
+                     const isEnabled = e.target.checked;
+                     const columnName = page === 'tax' ? 'is_enabled' : 'is_active';
+                     await supabaseClient.from(tableName).update({ [columnName]: isEnabled }).eq('id', id);
+                     logActivity(`Set ${tableName} ${id} ${columnName} to ${isEnabled}`);
+                     // Realtime listener handles the fetch/render
+                 }
+            });
+        }
+
+        
+        function setupSlideshowListeners() {
+            document.getElementById('addSlideshowImageBtn').addEventListener('click', () => document.getElementById('slideshowModal').classList.add('active'));
+            document.getElementById('saveSlideshowImageBtn').addEventListener('click', handleSlideshowUpload);
+            document.getElementById('slideshowContainer').addEventListener('click', e => {
+                if (e.target.closest('.delete-slideshow-btn')) handleDeleteSlideshow(e.target.closest('.delete-slideshow-btn'));
+            });
+        }
+        
+        async function handleSlideshowUpload() {
+            const imageFile = document.getElementById('slideshowImageInput').files[0];
+            if (!imageFile) return showToast('Please select an image file.', true);
+
+            const validationError = validateFileUpload(imageFile); // Uploads check fix
+            if (validationError) return showToast(validationError, true);
+
+            const { data, error } = await handleFileUpload(imageFile, 'slideshow-images'); // Separate bucket fix
+            if (error) return showToast(`Image upload failed: ${error.message}`, true);
+
+            const { error: dbError } = await supabaseClient.from('slideshow_images').insert({ image_url: data.publicUrl });
+            if (dbError) return showToast('Failed to save image reference.', true);
+            
+            showToast('Image uploaded!');
+            document.getElementById('slideshowModal').classList.remove('active');
+            document.getElementById('slideshowImageInput').value = '';
+            logActivity('Uploaded slideshow image');
+            await fetchData('slideshow_images', 'slideshow', { order: 'created_at' });
+            renderSlideshow();
+        }
+
+        async function handleDeleteSlideshow(btn) {
+            const id = btn.dataset.id;
+            const url = btn.dataset.url;
+            
+            promptForDelete('Delete this slideshow image?', async () => {
+                const { error: dbError } = await supabaseClient.from('slideshow_images').delete().eq('id', id);
+                if (dbError) return showToast('Failed to delete database record.', true);
+                
+                // Supabase storage path requires the bucket name and the rest of the path after the bucket name
+                // This is a rough path extraction, more robust path handling is recommended in production
+                const pathSegments = new URL(url).pathname.split('/');
+                const path = pathSegments.slice(pathSegments.indexOf('slideshow-images') + 1).join('/');
+
+                await supabaseClient.storage.from('slideshow-images').remove([path]);
+                showToast('Slideshow image deleted.'); 
+                logActivity('Deleted slideshow image');
+                await fetchData('slideshow_images', 'slideshow', { order: 'created_at' });
+                renderSlideshow();
+            });
+        }
+        
+        function openOfferModal(btn = null) {
+            const id = btn?.dataset.id || '';
+            const offer = caches.offers.find(o => o.id === id);
+
+            document.getElementById('offerModalTitle').textContent = offer ? 'Edit Offer' : 'Add New Offer';
+            document.getElementById('offerId').value = offer?.id || '';
+            document.getElementById('offerTitleInput').value = offer?.title || '';
+            document.getElementById('offerDescInput').value = offer?.description || '';
+            document.getElementById('offerImageInput').value = '';
+            const preview = document.getElementById('offerImagePreview');
+            preview.src = offer?.image_url || '';
+            preview.classList.toggle('hidden', !offer?.image_url);
+            document.getElementById('offerModal').classList.add('active');
+        }
+        
+        async function handleSaveOffer() {
+            const id = document.getElementById('offerId').value;
+            const title = document.getElementById('offerTitleInput').value;
+            if(!title) return showToast('Offer title is required.', true);
+            
+            let image_url = caches.offers.find(o => o.id === id)?.image_url || null;
+            const imageFile = document.getElementById('offerImageInput').files[0];
+            
+            if (imageFile) {
+                const validationError = validateFileUpload(imageFile); // Uploads check fix
+                if (validationError) return showToast(validationError, true);
+
+                const { data, error } = await handleFileUpload(imageFile, 'offer-images');
+                if (error) return showToast(`Image upload failed: ${error.message}`, true);
+                image_url = data.publicUrl;
+            }
+            
+            const offerData = { title, description: document.getElementById('offerDescInput').value, image_url };
+            const actionText = id ? `Updated offer: ${title}` : `Created offer: ${title}`;
+
+            const { error } = id ? await supabaseClient.from('offers').update(offerData).eq('id', id) : await supabaseClient.from('offers').insert(offerData);
+            
+            if (error) return showToast(`Error saving offer: ${error.message}`, true);
+            
+            showToast(`Offer ${id ? 'updated' : 'created'}!`); // Bug 1 fix
+            document.getElementById('offerModal').classList.remove('active');
+            logActivity(actionText);
+            await fetchData('offers', 'offers', { order: 'created_at' });
+            renderOffers();
+        }
+
+        async function handleDeleteOffer(btn) {
+            const id = btn.dataset.id;
+            promptForDelete('Delete this offer?', async () => {
+                const { error } = await supabaseClient.from('offers').delete().eq('id', id);
+                if (error) return showToast('Failed to delete offer.', true);
+                showToast('Offer deleted.'); 
+                logActivity(`Deleted offer ID ${id}`);
+                await fetchData('offers', 'offers', { order: 'created_at' });
+                renderOffers();
+            });
+        }
+        
+        async function handleOfferToggle(toggle) {
+            const id = toggle.dataset.id;
+            const is_active = toggle.checked;
+            await supabaseClient.from('offers').update({ is_active }).eq('id', id);
+            logActivity(`Set offer ${id} active status to ${is_active}`);
+            // Realtime listener handles the fetch/render
+        }
+        
+        function setupOfferListeners() {
+            document.getElementById('addOfferBtn').addEventListener('click', () => openOfferModal());
+            document.getElementById('saveOfferBtn').addEventListener('click', handleSaveOffer);
+            const container = document.getElementById('offersContainer');
+            container.addEventListener('click', e => {
+                if(e.target.closest('.edit-offer-btn')) openOfferModal(e.target.closest('.edit-offer-btn'));
+                if(e.target.closest('.delete-offer-btn')) handleDeleteOffer(e.target.closest('.delete-offer-btn'));
+            });
+            container.addEventListener('change', e => {
+                if(e.target.classList.contains('offer-active-toggle')) handleOfferToggle(e.target);
+            });
+        }
+        
+        function setupSettingsListeners() {
+            document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+                 // Settings Key Fix: Use currentUser.email as the unique ID
+                 const updates = { 
+                    user_email: currentUser.email,
+                    name: document.getElementById('restaurantName').value, 
+                    currency_symbol: document.getElementById('restaurantCurrency').value, 
+                    logo_url: document.getElementById('logoUrl').value, 
+                    welcome_message: document.getElementById('welcomeMessage').value, 
+                    google_business_url: document.getElementById('googleBusinessLink').value, 
+                 };
+                 // Use upsert to insert or update based on the primary key (user_email)
+                 const { error } = await supabaseClient.from('settings').upsert(updates);
+                 
+                 if (error) showToast('Error saving settings: ' + error.message, true);
+                 else { 
+                    showToast('Settings saved successfully!'); 
+                    logActivity('Updated restaurant settings');
+                    await fetchSettings();
+                    renderSettings();
+                 }
+            });
+            document.getElementById('deleteAllOrdersBtn').addEventListener('click', () => {
+                // Delete all orders fix: require 'DELETE' confirmation
+                promptForDelete('This will delete ALL order history permanently. Type DELETE to confirm.', async () => {
+                    const { error } = await supabaseClient.from('orders').delete().neq('status', 'non-existent-status'); // Deletes all rows
+                    if (error) showToast('Error deleting order history: ' + error.message, true);
+                    else { 
+                        showToast('All order history has been deleted.'); 
+                        logActivity('Deleted all order history');
+                        // Realtime listener handles the fetch/render
+                    }
+                }, true); // requireInput = true
+            });
+             document.getElementById('downloadDataBtn').addEventListener('click', async () => {
+                showToast('Preparing data...');
+                const { data: orders, error: orderError } = await supabaseClient.from('orders').select('*');
+                const { data: activity_logs, error: logError } = await supabaseClient.from('activity_logs').select('*');
+                if(orderError || logError) return showToast('Could not fetch data for download.', true);
+                const dataToDownload = { restaurant_name: restaurantSettings.name || 'Export', admin_email: currentUser.email, export_date: new Date().toISOString(), orders, activity_logs };
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToDownload, null, 2));
+                const a = document.createElement('a');
+                a.setAttribute("href", dataStr);
+                a.setAttribute("download", `${restaurantSettings.name}_export_${new Date().toISOString().split('T')[0]}.json`);
+                document.body.appendChild(a); a.click(); a.remove();
+                showToast('Download started!'); logActivity('Downloaded all data');
+            });
+        }
+        
+        function setupEventListeners() {
+            document.getElementById('mainNav').addEventListener('click', (e) => {
+                if (e.target.tagName === 'A' || e.target.closest('a')) {
+                    e.preventDefault();
+                    const link = e.target.closest('a');
+                    const targetId = link.getAttribute('href').substring(1);
+                    document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+                    document.getElementById(targetId)?.classList.remove('hidden');
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                    window.location.hash = targetId;
+
+                    if (targetId === 'analytics') {
+                        renderAnalytics(true); // Redraw charts when switching to Analytics page
                     }
                 }
             });
 
-            document.getElementById('historyContainer').addEventListener('click', e => {
-                const invoiceBtn = e.target.closest('.generate-invoice-btn');
-                const deleteBtn = e.target.closest('.delete-order-btn');
-                if(invoiceBtn) {
-                    const orderId = invoiceBtn.dataset.orderId;
-                    const order = ordersCache.find(o => o.id === orderId);
-                    generateAndShowInvoice(order);
-                }
-                if(deleteBtn) {
-                    const orderId = deleteBtn.dataset.orderId;
-                    const orderIdDisplay = ordersCache.find(o => o.id === orderId)?.id.substring(0,6) || orderId;
-                    const message = `Are you sure you want to permanently delete order ${orderIdDisplay}? This cannot be undone.`;
-                    const deleteFunc = async () => {
-                        const { error } = await supabaseClient.from('orders').delete().eq('id', orderId);
-                        if (error) { showToast('Error deleting order.', true); } 
-                        else { showToast('Order deleted successfully.'); logActivity(`Deleted order ID ${orderId}`); }
-                    };
-                    promptForDelete(deleteFunc, message);
-                }
-            });
+            const currentHash = window.location.hash.substring(1) || 'dashboard';
+            document.querySelector(`.nav-link[href="#${currentHash}"]`)?.click();
 
-            const setupCrudListeners = (page, tableName, modalId, addBtnId, saveBtnId, fields) => {
-                const containerId = page === 'tax' ? 'taxesContainer' : `${page}sContainer`;
-                const container = document.getElementById(containerId);
-                document.getElementById(addBtnId).addEventListener('click', () => { document.getElementById(`${page}Id`).value = ''; fields.forEach(f => document.getElementById(f.inputId).value = ''); document.getElementById(modalId).classList.add('active'); });
-                if (container) {
-                    container.addEventListener('click', async e => {
-                        const editBtn = e.target.closest(`.edit-${page}-btn`); const deleteBtn = e.target.closest(`.delete-${page}-btn`);
-                        if (editBtn) { document.getElementById(`${page}Id`).value = editBtn.dataset.id; fields.forEach(f => document.getElementById(f.inputId).value = editBtn.dataset[f.dataAttr]); document.getElementById(modalId).classList.add('active'); }
-                        if (deleteBtn && confirm(`Are you sure you want to delete this ${page}?`)) { const { error } = await supabaseClient.from(tableName).delete().eq('id', deleteBtn.dataset.id); if (error) showToast(`Error deleting ${page}.`, true); else { showToast(`${page.charAt(0).toUpperCase() + page.slice(1)} deleted.`); logActivity(`Deleted ${page} ID ${deleteBtn.dataset.id}`); } }
-                    });
-                }
-                document.getElementById(saveBtnId).addEventListener('click', async () => {
-                    const id = document.getElementById(`${page}Id`).value; const record = {};
-                    for (const f of fields) { let value = document.getElementById(f.inputId).value; record[f.dbField] = f.isNumeric ? parseFloat(value) : value; if (!value) return showToast(`${f.label} is required.`, true); }
-                    const { error } = id ? await supabaseClient.from(tableName).update(record).eq('id', id) : await supabaseClient.from(tableName).insert(record);
-                    if (error) showToast(`Error saving ${page}: ${error.message}`, true); else { showToast(`${page.charAt(0).toUpperCase() + page.slice(1)} saved!`); document.getElementById(modalId).classList.remove('active'); logActivity(`${id ? 'Updated' : 'Created'} ${page}: ${record[fields[0].dbField]}`); }
-                });
-                const setupToggleListener = (toggleContainerId, columnName) => {
-                    const toggleContainer = document.getElementById(toggleContainerId);
-                    if (toggleContainer) { toggleContainer.addEventListener('change', async e => { if(e.target.type === 'checkbox') { const id = e.target.dataset.id; const value = e.target.checked; const update = {}; update[columnName] = value; await supabaseClient.from(tableName).update(update).eq('id', id); logActivity(`Set ${tableName} ${id} ${columnName} to ${value}`); } }); }
-                };
-                if(page === 'tax') setupToggleListener('taxesContainer', 'is_enabled'); if(page === 'promo') setupToggleListener('promosContainer', 'is_active');
-            };
-
-            setupCrudListeners('tax', 'taxes', 'taxModal', 'addTaxBtn', 'saveTaxBtn', [ { inputId: 'taxNameInput', dbField: 'name', dataAttr: 'name', label: 'Tax Name' }, { inputId: 'taxRateInput', dbField: 'rate_percent', dataAttr: 'rate', label: 'Tax Rate', isNumeric: true } ]);
-            setupCrudListeners('promo', 'promotions', 'promoModal', 'addPromoBtn', 'savePromoBtn', [ { inputId: 'promoCodeInput', dbField: 'code', dataAttr: 'code', label: 'Promo Code' }, { inputId: 'promoDiscountInput', dbField: 'discount_percent', dataAttr: 'discount', label: 'Discount', isNumeric: true } ]);
+            document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => btn.closest('.modal').classList.remove('active')));
             
-            document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
-                 const updates = { id: 1, name: document.getElementById('restaurantName').value, currency_symbol: document.getElementById('restaurantCurrency').value, logo_url: document.getElementById('logoUrl').value, primary_color: document.getElementById('primaryColor').value, secondary_color: document.getElementById('secondaryColor').value, google_business_url: document.getElementById('googleBusinessLink').value, };
-                 const { error } = await supabaseClient.from('settings').upsert(updates);
-                 if (error) { showToast('Error saving settings.', true); } else { showToast('Settings saved successfully!'); await logActivity('Updated restaurant settings'); fetchAndRenderSettings(); }
-            });
-
-            document.getElementById('downloadPdfBtn').addEventListener('click', () => {
-                const { jsPDF } = window.jspdf; const invoiceContent = document.getElementById('invoiceContent');
-                const doc = new jsPDF({ unit: 'px', format: 'a4', orientation: 'portrait' });
-                html2canvas(invoiceContent, { scale: 2 }).then(canvas => {
-                    const imgData = canvas.toDataURL('image/png'); const pdfWidth = doc.internal.pageSize.getWidth(); const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-                    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-                    const orderId = invoiceContent.dataset.orderId || 'invoice'; doc.save(`${orderId}.pdf`); logActivity(`Downloaded invoice for order ${orderId}`);
-                });
-            });
-
-            document.getElementById('printInvoiceBtn').addEventListener('click', () => {
-                logActivity(`Attempting to print invoice`);
-                document.body.classList.add('printing-invoice');
-                window.print();
-            });
-            window.addEventListener('afterprint', () => {
-                document.body.classList.remove('printing-invoice');
-            });
-
-            // --- DATA MANAGEMENT LISTENERS ---
+            let deleteAction = null;
+            let needsConfirmationInput = false;
             const confirmDeleteModal = document.getElementById('confirmDeleteModal');
-            let deleteFunction = null;
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            const confirmationInputContainer = document.getElementById('deleteConfirmationInputContainer');
+            const confirmationInput = document.getElementById('deleteConfirmationInput');
 
-            const promptForDelete = (deleteFunc, message) => {
+            window.promptForDelete = (message, action, requireInput = false) => {
                 document.getElementById('confirmDeleteText').textContent = message;
-                deleteFunction = deleteFunc;
+                deleteAction = action;
+                needsConfirmationInput = requireInput;
+                confirmationInput.value = '';
+
+                confirmationInputContainer.classList.toggle('hidden', !requireInput);
+                confirmDeleteBtn.disabled = requireInput; // Disable if input is required
                 confirmDeleteModal.classList.add('active');
             };
+            
+            confirmationInput.addEventListener('input', () => {
+                 confirmDeleteBtn.disabled = confirmationInput.value !== 'DELETE';
+            });
 
-            document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
-                if (typeof deleteFunction === 'function') {
-                    await deleteFunction();
-                }
+            confirmDeleteBtn.addEventListener('click', async () => {
+                if (needsConfirmationInput && confirmationInput.value !== 'DELETE') return;
+                if (typeof deleteAction === 'function') await deleteAction();
                 confirmDeleteModal.classList.remove('active');
             });
             
-            const performDelete = async (startDate) => {
-                showToast('Deletion in progress...');
-                const dateString = startDate.toISOString();
-                // Note: The original logic used lt which is "less than". This is correct for "older than".
-                const { error: orderError } = await supabaseClient.from('orders').delete().lt('created_at', dateString);
-                const { error: logError } = await supabaseClient.from('activity_logs').delete().lt('created_at', dateString);
-
-                if(orderError || logError) {
-                    showToast('An error occurred during deletion.', true);
-                    console.error('Deletion Error:', orderError || logError);
-                } else {
-                    showToast('Data older than the selected period has been deleted.');
-                    logActivity(`Deleted data before ${startDate.toLocaleDateString()}`);
-                }
-            };
-
-            document.getElementById('delete24hBtn').addEventListener('click', () => {
-                const date = new Date(); date.setDate(date.getDate() - 1);
-                promptForDelete(() => performDelete(date), 'This will permanently delete all Order History and Admin Activity older than 24 hours. Are you sure?');
-            });
-            document.getElementById('delete7dBtn').addEventListener('click', () => {
-                const date = new Date(); date.setDate(date.getDate() - 7);
-                promptForDelete(() => performDelete(date), 'This will permanently delete all Order History and Admin Activity older than 7 days. Are you sure?');
-            });
-            document.getElementById('delete30dBtn').addEventListener('click', () => {
-                const date = new Date(); date.setDate(date.getDate() - 30);
-                promptForDelete(() => performDelete(date), 'This will permanently delete all Order History and Admin Activity older than 30 days. Are you sure?');
-            });
-            document.getElementById('deleteCustomBtn').addEventListener('click', () => {
-                const startDate = document.getElementById('deleteStartDate').value;
-                const endDate = document.getElementById('deleteEndDate').value;
-                if (!startDate || !endDate) return showToast('Please select both a start and end date.', true);
-                
-                const start = new Date(startDate);
-                const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999); // Include the whole end day
-
-                const message = `This will permanently delete all Order History and Admin Activity between ${start.toLocaleDateString()} and ${end.toLocaleDateString()}. Are you sure?`;
-                
-                const deleteInRange = async () => {
-                    showToast('Deletion in progress...');
-                    const { error: orderError } = await supabaseClient.from('orders').delete().gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
-                    const { error: logError } = await supabaseClient.from('activity_logs').delete().gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
-
-                     if(orderError || logError) {
-                        showToast('An error occurred during deletion.', true);
-                     } else {
-                        showToast('Data in the selected range has been deleted.');
-                        logActivity(`Deleted data in custom range`);
-                     }
-                };
-                promptForDelete(deleteInRange, message);
-            });
-
-            document.getElementById('downloadDataBtn').addEventListener('click', async () => {
-                showToast('Preparing data for download...');
-                const { data: orders, error: orderError } = await supabaseClient.from('orders').select('*');
-                const { data: activity_logs, error: logError } = await supabaseClient.from('activity_logs').select('*');
-
-                if(orderError || logError) return showToast('Could not fetch data for download.', true);
-
-                const dataToDownload = {
-                    restaurant_name: restaurantSettings.name || 'Export',
-                    export_date: new Date().toISOString(),
-                    orders,
-                    activity_logs
-                };
-
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToDownload, null, 2));
-                const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr);
-                downloadAnchorNode.setAttribute("download", `${restaurantSettings.name}_export_${new Date().toISOString().split('T')[0]}.json`);
-                document.body.appendChild(downloadAnchorNode);
-                downloadAnchorNode.click();
-                downloadAnchorNode.remove();
-                showToast('Download started!');
-                logActivity('Downloaded all data');
-            });
+            setupMenuListeners();
+            setupTableListeners();
+            setupOrderListeners();
+            setupCrudListeners('tax', 'taxes', 'taxModal', 'addTaxBtn', 'saveTaxBtn', ['taxNameInput', 'taxRateInput'], ['name', 'rate_percent']);
+            setupCrudListeners('promo', 'promotions', 'promoModal', 'addPromoBtn', 'savePromoBtn', ['promoCodeInput', 'promoDiscountInput'], ['code', 'discount_percent']);
+            // The functions are now defined above, so the ReferenceError is fixed.
+            setupSlideshowListeners(); 
+            setupOfferListeners(); 
+            setupSettingsListeners();
+            setupInvoiceListeners(); // PDF Download & Print fix
         }
         
-        checkSession();
+        // --- Final Check ---
+        if (!supabaseUrl.includes('supabase.co') || !supabaseKey.startsWith('ey')) {
+            showToast('Supabase credentials are not set correctly! Please update the URL and Key in the script.', true);
+        } else {
+            checkSession();
+        }
     </script>
 </body>
 </html>
-
